@@ -1,0 +1,46 @@
+- Not showing anything
+ -> Possible minimized scale due to inches. Check Configure -> Unit Setup -> System Unit Setup
+- Cannot export .visual
+ -> Go to Customize -> Config System Paths -> 3rd Party Plugin -> add the /bigword/tools/exporter/version from BigWorld 2.1
+- Not valid material link: (absolule link to .png making export failure)
+ -> Rendering -> Material Editor -> Photometric/Bitmap Path -> Strip All Paths 
+- Crash upon F5/Entering with no log
+ Possible missing hardpoint (HP). Check HP_gunJoint in turret, etc.
+ 
+- Animate antenna:
+ + Create two bones @ root and tip (Create -> System -> Bones IK chain). Can create multiple bones, but should only assign those two to the mesh
+ + Select all antenna vertices; Modifier List -> Skin. Add the two bones to the mesh.
+ + While still selecting all vertices, select Edit Envelope (or expandable Skin->Envelop)
+ + Adjust the root bone so the outer envelope cover the whole antenna; long-press falloff (third button in Envelope Properties) and select quick falloff
+ + Adjust the tip bone, also use the outer envelope on the whole antenna, long-press falloff and either use linear or quick falloff. Quick is more conservative; Linear introduce some sort of "bounce" on the lower section.
+ + NOTE: Make sure to change the fx to the skinned version when copying material from original
+ 
+Making SWF:
+Compile the python binding with compileall
+C:\Python27\python.exe -m compileall ..\py\mod_UML_interface.py
+C:\Python27\python.exe -m compileall mod_UML_interface.py
+
+Compile the swf, with its external swc(s) are found in gui-part1/2.pkg; stand in `as3` folder
+D:\Archive\flex_sdk_4.6.0.23201B\bin\mxmlc  -compiler.source-path=. -compiler.external-library-path+=lib\common-1.0-SNAPSHOT.swc,lib\gui_base-1.0-SNAPSHOT.swc -static-link-runtime-shared-libraries=true -o UML_MainGUI.swf uml\UML_MainGUI.as
+
+Those swc can also be viewed using JPEXS Free Flash Decompiler
+
+Binding between swf and python classes are achieved with:
+g_entitiesFactories.addSettings(ViewSettings("UML_MainGUI", UML_MainGUI, 'UML_MainGUI.swf',
+						WindowLayer.WINDOW, None, ScopeTemplates.GLOBAL_SCOPE, isModal=True, canClose=True, canDrag=False))
+
+Currently only swf can call python function; creating GUI objects must use App.utils.classFactory.getClass. NOTE: can use getClassName instead of searching for this crap
+DropdownMenu -> DropdownMenuUI
+SoundButtonEx -> ButtonNormal
+
+Use ScrollingListPx instead of ScrollingListEx;
+
+The game reload the swf after battle; so you can replace and test things quick on the flash front; simply replace the file, play a battle, and the changes will be updated.
+
+GIMP:
+Edit separate channels by Color -> Components -> Decompose, choose RGBA, edit the other image as you please, then Recompose.
+AO map:
+- R is decal exclusion map. White will not receive decals.
+- G is Ambient Occlusion, ie shadow from global illumination. White will receive propotionally less shadow than black
+- B is mud exclusion map. White will not receive mud.
+- A is camouflage exclusion map. Black will not receive camo.

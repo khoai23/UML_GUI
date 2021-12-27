@@ -15,8 +15,8 @@ Once installed the prerequisite:
 JPEXS can be used to inspect the concerning `.swc` in `as3\lib`. Those are lifted straight from WoT's inbuilt data (`res\packages\gui-part1|2.pkg`, `gui\flash`)
 
 TODO:
-[ ] Localized TankID and name instead of relying on crawler data.
-[ ] StyleSet selection
-[ ] Completely new header w/ swapping component (hull/turret/gun)
-[ ] Paint/Camo in selectable format (instead of specified IDs)
-[ ] Overhaul if manage to fix ScrollingListPx
+- [ ] Localized TankID and name instead of relying on crawler data.
+- [ ] StyleSet selection
+- [ ] Completely new header w/ swapping component (hull/turret/gun)
+- [ ] Paint/Camo in selectable format (instead of specified IDs)
+- [ ] Overhaul if manage to fix ScrollingListPx

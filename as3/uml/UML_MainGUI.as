@@ -54,9 +54,9 @@ package uml
 	  public var current_profile_usewhitelist : CheckBox;
 	  public var current_profile_target : TextInput;
 	  public var current_profile_target_help : LabelControl;
-	  public var current_profile_camo : TextInput;
+	  public var current_profile_camo : DropdownMenu;
 	  public var current_profile_camo_help : LabelControl;
-	  public var current_profile_paint : TextInput;
+	  public var current_profile_paint : DropdownMenu;
 	  public var current_profile_paint_help : LabelControl;
 	  public var delete_profile : SoundButtonEx;
 	  
@@ -75,13 +75,15 @@ package uml
 	  //public var profileIcon : UILoaderAlt
 	  //protected var current_profile_index : Number = 0;
 	  protected var list_profile_objects : Array;
+	  protected var camo_paint_data : Object;
 	  
       public var receiveStringConfigAtPy : Function = null; // this will receive config data from swf to python
 	  public var getStringConfigFromPy : Function = null;	// this will get config data from python to swf
 	  public var getVehicleSelectorDataFromPy : Function = null; // this will get permanent vehicle categories (nation, class, tier)
 	  public var loadVehiclesWithCriteriaFromPy : Function = null; // this will load the list of vehicles fitting the filter above
 	  public var loadVehicleProfileFromPy : Function = null;	  // this will convert the proper name into the accompanying text input
-	  public var removeProfileAtPy : Function = null;
+	  public var removeProfileAtPy : Function = null; // this will purge the profile on Python / XML end
+	  public var loadCamoPaintDataFromPy : Function = null; // this will load the needed data to camo/paint dropdown
 
 	  public function UML_MainGUI() {
 		 super();
@@ -136,10 +138,12 @@ package uml
 		   this.current_profile_enable = createCheckbox("Enabled", 35, 105 + 20);
 		   this.current_profile_swapNPC = createCheckbox("Model swap NPC", 35 + 125, 105 + 20);
 		   this.current_profile_camo_help = createLabel("Camouflage ID:", 35 + 125, 105 + 40);
-		   this.current_profile_camo = createTextInput("camo_placeholder", 35 + 225, 102 + 40);
+		   
+		   this.current_profile_camo = createDropdown(35 + 225, 102 + 40);
 		   this.current_profile_paint_help = createLabel("Paint ID:", 35 + 125, 105 + 60);
-		   this.current_profile_paint = createTextInput("paint_placeholder", 35 + 225, 102 + 60);
+		   this.current_profile_paint = createDropdown(35 + 225, 102 + 60);
 		   this.delete_profile = createButton("Delete this Profile", 35 + 175, 105 + 85, true);
+		   this.populatePaintCamo();
 		   
 		   // adding appropriate listeners
 			this.forward_btn.addEventListener(ButtonEvent.CLICK, this.forwardProfileIndex);
@@ -150,8 +154,8 @@ package uml
 			this.current_profile_enable.addEventListener(ButtonEvent.CLICK, this.onSetEnableProfile);
 			this.current_profile_swapNPC.addEventListener(ButtonEvent.CLICK, this.onSetEnableProfileForNPC);
 		    this.current_profile_target.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onWhitelistChange);
-		    this.current_profile_camo.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onCamoChange);
-		    this.current_profile_paint.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onPaintChange);
+		    this.current_profile_camo.addEventListener(ListEvent.INDEX_CHANGE, this.onCamoChange);
+		    this.current_profile_paint.addEventListener(ListEvent.INDEX_CHANGE, this.onPaintChange);
 			this.delete_profile.addEventListener(ButtonEvent.CLICK, this.removeProfile);
 			
 			// adding the concerning VehicleSelector panel
@@ -166,6 +170,22 @@ package uml
 		   this.profile_list.dataProvider.invalidate();
 		   this.profile_list.visible = true;
 		}
+	  }
+	  
+	  internal function populatePaintCamo() : void {
+		this.camo_paint_data = this.loadCamoPaintDataFromPy();
+		// update with Remove & No change (-1, 0)
+		this.camo_paint_data["camoName"].unshift("Remove", "No change");
+		this.camo_paint_data["paintName"].unshift("Remove", "No change");
+		this.camo_paint_data["camoID"].unshift(-1, 0);
+		this.camo_paint_data["paintID"].unshift(-1, 0);
+		
+		this.current_profile_camo.dataProvider = new DataProvider(this.camo_paint_data["camoName"]);
+		this.current_profile_paint.dataProvider = new DataProvider(this.camo_paint_data["paintName"]);
+		this.current_profile_camo.invalidateData();
+		this.current_profile_paint.invalidateData();
+		this.current_profile_camo.selectedIndex = 1; // default to no changes
+		this.current_profile_paint.selectedIndex = 1;
 	  }
 	  
 	  internal function createVehicleSelector(x: Number, y: Number) : void {
@@ -207,8 +227,9 @@ package uml
 			this.backward_btn.removeEventListener(ButtonEvent.CLICK, this.backwardProfileIndex);
 			this.profile_selector.removeEventListener(ListEvent.INDEX_CHANGE, this.loadProfileAtCurrentIndex);
 			this.current_profile_enable.removeEventListener(ButtonEvent.CLICK, this.onSetEnableProfile);
-		    this.current_profile_target.removeEventListener(FocusHandlerEvent.FOCUS_OUT, this.onWhitelistChange);
-		    this.current_profile_camo.removeEventListener(FocusHandlerEvent.FOCUS_OUT, this.onCamoChange);
+		    this.current_profile_target.removeEventListener(ListEvent.INDEX_CHANGE, this.onWhitelistChange);
+		    this.current_profile_camo.removeEventListener(ListEvent.INDEX_CHANGE, this.onCamoChange);
+		    this.current_profile_paint.removeEventListener(ListEvent.INDEX_CHANGE, this.onPaintChange);
 			
 			this.vehicle_nations.removeEventListener(ListEvent.INDEX_CHANGE, this.loadVehiclesWithCriteriaToAS);
 			this.vehicle_type.removeEventListener(ListEvent.INDEX_CHANGE, this.loadVehiclesWithCriteriaToAS);
@@ -251,8 +272,8 @@ package uml
 		} else {
 			this.current_profile_target.text = ""
 		}
-		this.current_profile_camo.text = String(currentProfile["camouflageID"]);
-		this.current_profile_paint.text = String(currentProfile["paintID"]);
+		this.current_profile_camo.selectedIndex = this.camo_paint_data["camoID"].indexOf(currentProfile["camouflageID"]);
+		this.current_profile_paint.selectedIndex = this.camo_paint_data["paintID"].indexOf(currentProfile["paintID"]);
 	  }
 	  
 	  internal function onSetEnableProfile() : void {
@@ -274,23 +295,12 @@ package uml
 	  }
 	  
 	  internal function onCamoChange() : void {
-		var camoID : Number = parseInt(this.current_profile_camo.text);
-		if(isNaN(camoID)) {
-			// invalid camo, reset to whatever it was
-			this.current_profile_camo.text = String(this.list_profile_objects[this.profile_selector.selectedIndex]["camouflageID"]);
-		} else {
-			this.list_profile_objects[this.profile_selector.selectedIndex]["camouflageID"] = camoID;
-		}
+		// retrieve matching ID from camoID
+		this.list_profile_objects[this.profile_selector.selectedIndex]["camouflageID"] = this.camo_paint_data["camoID"][this.current_profile_camo.selectedIndex];
 	  }
 	  
 	  internal function onPaintChange() : void {
-		var paintID : Number = parseInt(this.current_profile_paint.text);
-		if(isNaN(paintID)) {
-			// invalid camo, reset to whatever it was
-			this.current_profile_paint.text = String(this.list_profile_objects[this.profile_selector.selectedIndex]["paintID"]);
-		} else {
-			this.list_profile_objects[this.profile_selector.selectedIndex]["paintID"] = paintID;
-		}
+		this.list_profile_objects[this.profile_selector.selectedIndex]["paintID"] = this.camo_paint_data["paintID"][this.current_profile_paint.selectedIndex];
 	  }
 	  
 	  internal function loadVehiclesWithCriteriaToAS() : void {
@@ -315,7 +325,7 @@ package uml
 			this.profile_selector.selectedIndex = profile_index_if_exist;
 			return
 		} else { // create new object at the end and jump into it.
-			var newProfile : Object = {"name": this.vehicle_profile_field.text, "enabled": false, "useWhitelist": true, "whitelist": "", "camouflageID": 0};
+			var newProfile : Object = {"name": this.vehicle_profile_field.text, "enabled": false, "useWhitelist": true, "whitelist": "", "camouflageID": 0, "paintID": 0};
 			this.list_profile_objects.push(newProfile);
 			this.reloadProfileSelector();
 			this.profile_selector.selectedIndex = this.list_profile_objects.length - 1;

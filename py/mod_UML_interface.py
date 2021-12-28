@@ -10,6 +10,7 @@ import BigWorld
 import ResMgr
 from CurrentVehicle import g_currentVehicle, g_currentPreviewVehicle
 from items import vehicles, _xml
+import nations
 
 import json
 import re
@@ -46,27 +47,41 @@ class UML_MainGUI(UML_mainMeta):
         
         # self.dumpCamouflageData()
         
-        # basefiledir = __file__.rsplit(r"/")[0] if "/" in __file__ else "."
-        with open('mods/configs/tank_data.json', "r") as jf:
-            self._nation_data, self._tier_data, self._type_data, self._code_to_tank = json.load(jf)
-        self._nation_data = {k: set(v) for k, v in self._nation_data.items()}
-        self._tier_data = {k: set(v) for k, v in self._tier_data.items()}
-        self._type_data = {k: set(v) for k, v in self._type_data.items()}
-        self._tank_to_code = {v: k for k, v in self._code_to_tank.items()}
-        
+        # Construct tank data
+        list_every_vehicles = (vehicles.g_cache.vehicle(nations.NAMES.index(nationName), vehicleId) for nationName in nations.NAMES for vehicleId in vehicles.g_list.getList(nations.NAMES.index(nationName)))
+        self._nation_data, self._tier_data, self._code_to_tank = {}, {}, {}
+        self._type_data = {"heavyTank": set(), "lightTank": set(), "mediumTank": set(), "AT-SPG": set(), "SPG": set()}
+        # ignore the variants by keywords. Maybe?
+        ignore_keyword = {"MapsTraining", "_bootcamp", "_FL", "_training", "_IGR", "_bot"}
+        for vehicle_obj in list_every_vehicles:
+            nation, tankprofilename = vehicle_obj.name.split(":")
+            if(any(k in tankprofilename for k in ignore_keyword)):
+                continue
+            # add nation / type / tier
+            nationlist = self._nation_data[nation] = self._nation_data.get(nation, set())
+            nationlist.add(tankprofilename)
+            tier = vehicle_obj.level
+            tierlist = self._tier_data[tier] = self._tier_data.get(tier, set())
+            tierlist.add(tankprofilename)
+            for typetag in vehicle_obj.tags:
+                if(typetag in self._type_data):
+                    self._type_data[typetag].add(tankprofilename)
+            # name reference
+            self._code_to_tank[tankprofilename] = vehicle_obj.userString
+        # backward search from tank name to profilename
+        self._tank_to_code = {name: key for key, name in self._code_to_tank.items()}
+        # also update tier to str format (currently int)
+        self._tier_data = {str(k): v for k, v in self._tier_data.items()}
         # debug
         # print("All callable from sectionMain: ", [att for att in dir(self.sectionMain) if callable(getattr(self.sectionMain, att))] )
         self.vehicleSelectorData = None
-
-    def dumpCamouflageData(self):
-        ogCamoDict = vehicles.g_cache.customization20().camouflages
-        camoDict = {k: v.userString for k, v in ogCamoDict.items() }
-        print(camoDict)
-        with open("camo.json", "w") as cf:
-            try:
-                json.dump(camoDict, cf)
-            except Exception as e:
-                print("Error when dumping camo:", e)
+        
+        # Construct camo & paint data
+        self._camo_list = [(k, v.userString) for k, v in vehicles.g_cache.customization20().camouflages.items()]
+        self._paint_list = [(k, v.userString) for k, v in vehicles.g_cache.customization20().paints.items()]
+        # sanitize - if userString is blank, replace with formatted unknown
+        self._camo_list = [(k, n if n != "" else "Unknown (ID {:d})".format(k)) for k, n in self._camo_list ]
+        self._paint_list = [(k, n if n != "" else "Unknown (ID {:d})".format(k)) for k, n in self._paint_list ]
 
     def printObjToLog(self, obj):
         print("printObjToLog, obj found: ", obj, type(obj))
@@ -199,7 +214,7 @@ class UML_MainGUI(UML_mainMeta):
             self.vehicleSelectorData = {
                 "nations": ["Any"] + sorted(list(self._nation_data.keys())),
                 "types": ["Any"] + sorted(list(self._type_data.keys())),
-                "tiers": ["Any"] + sorted(list(self._tier_data.keys()), key=lambda s: roman_conv.get(s.replace("Tier_", ""), 99))
+                "tiers": ["Any"] + sorted(self._tier_data.keys(), key=lambda v: int(v))
             }
         return self.vehicleSelectorData
     
@@ -228,7 +243,11 @@ class UML_MainGUI(UML_mainMeta):
     def removeProfileAtPy(self, profilename):
         profilexmlname = 'models/' + profilename
         self.sectionMain.deleteSection(profilexmlname)
-        
+    
+    def loadCamoPaintDataFromPy(self):
+        camoID, camoName = zip(*self._camo_list)
+        paintID, paintName = zip(*self._paint_list)
+        return {"camoID": list(camoID), "paintID": list(paintID), "camoName": list(camoName), "paintName": list(camoName)}
     
 """Add binding from the AS's UML_MainGUI class to the current python UML_MainGUI class"""
 g_entitiesFactories.addSettings(ViewSettings("UML_MainGUI", UML_MainGUI, 'UML_MainGUI.swf',

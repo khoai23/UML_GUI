@@ -17,11 +17,10 @@
  
 Making SWF:
 Compile the python binding with compileall
-C:\Python27\python.exe -m compileall ..\py\mod_UML_interface.py
-C:\Python27\python.exe -m compileall mod_UML_interface.py
+C:\Python27\python.exe -m compileall py\mod_UML_interface.py
 
 Compile the swf, with its external swc(s) are found in gui-part1/2.pkg; stand in `as3` folder
-D:\Archive\flex_sdk_4.6.0.23201B\bin\mxmlc  -compiler.source-path=. -compiler.external-library-path+=lib\common-1.0-SNAPSHOT.swc,lib\gui_base-1.0-SNAPSHOT.swc -static-link-runtime-shared-libraries=true -o UML_MainGUI.swf uml\UML_MainGUI.as
+D:\Archive\flex_sdk_4.6.0.23201B\bin\mxmlc  -compiler.source-path=as3 -compiler.external-library-path+=as3\lib\common-1.0-SNAPSHOT.swc,as3\lib\gui_base-1.0-SNAPSHOT.swc -static-link-runtime-shared-libraries=true -o as3\UML_MainGUI.swf as3\uml\UML_MainGUI.as
 
 Those swc can also be viewed using JPEXS Free Flash Decompiler
 

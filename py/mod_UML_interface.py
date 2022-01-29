@@ -75,7 +75,7 @@ class UML_MainGUI(UML_mainMeta):
             possible_styles = list(vehicle_obj.hulls[0].modelsSets.keys())
             possible_styles.remove('default')
             if(len(possible_styles) > 0):
-                print("[UML GUI] Cached style: {:s} - {}".format(tankprofilename, possible_styles))
+                # print("[UML GUI] Cached style: {:s} - {}".format(tankprofilename, possible_styles))
                 self._list_styles[tankprofilename] = possible_styles
         # backward search from tank name to profilename
         self._tank_to_code = {name: key for key, name in self._code_to_tank.items()}

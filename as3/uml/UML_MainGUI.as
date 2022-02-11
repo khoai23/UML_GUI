@@ -265,7 +265,6 @@ package uml
 		// load respective data into components
 		var currentProfile : Object = this.list_profile_objects[current_idx];
 		this.current_profile_name.text = currentProfile["name"];
-		this.current_profile_name.updateText();
 		this.current_profile_enable.selected = currentProfile["enabled"];
 		this.current_profile_swapNPC.selected = currentProfile["swapNPC"];
 		if(currentProfile["useWhitelist"]) {

@@ -43,3 +43,7 @@ AO map:
 - G is Ambient Occlusion, ie shadow from global illumination. White will receive propotionally less shadow than black
 - B is mud exclusion map. White will not receive mud.
 - A is camouflage exclusion map. Black will not receive camo.
+
+OTHER:
+Soviet sticker: 15924, 15872, 15877 looks great; 15926 is a plain, faded white star
+Vietnam sticker: 410 is flag, 38 is armored flag

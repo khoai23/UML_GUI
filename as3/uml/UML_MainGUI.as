@@ -348,11 +348,15 @@ package uml
 		var vehicles : Array = this.loadVehiclesWithCriteriaFromPy(this.vehicle_nations.selectedIndex, this.vehicle_type.selectedIndex, this.vehicle_tier.selectedIndex);
 		this.vehicle_selector.dataProvider = new DataProvider(vehicles);
 		this.vehicle_selector.selectedIndex = 0;
+		this.loadVehicleProfileToAS();
 	  }
 	  
 	  internal function loadVehicleProfileToAS() : void {
 		// on clicking a vehicle within vehicle_selector, change the corresponding TextInput to the profile name
-		this.vehicle_profile_field.text = this.loadVehicleProfileFromPy(this.vehicle_selector.dataProvider[this.vehicle_selector.selectedIndex]);
+		if(this.vehicle_selector.selectedIndex == -1) // not selected
+			this.vehicle_profile_field.text = "vehicle_profile_name"
+		else
+			this.vehicle_profile_field.text = this.loadVehicleProfileFromPy(this.vehicle_selector.dataProvider[this.vehicle_selector.selectedIndex]);
 	  }
 	  
 	  internal function addNewProfile() : void {

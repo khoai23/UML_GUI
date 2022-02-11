@@ -15,6 +15,7 @@ import nations
 import json
 import re
 _multispace_regex = re.compile("\s+")
+import inspect
 
 __all__ = ('UML_main', )
 
@@ -51,8 +52,9 @@ class UML_MainGUI(UML_mainMeta):
         list_every_vehicles = (vehicles.g_cache.vehicle(nations.NAMES.index(nationName), vehicleId) for nationName in nations.NAMES for vehicleId in vehicles.g_list.getList(nations.NAMES.index(nationName)))
         self._nation_data, self._tier_data, self._code_to_tank = {}, {}, {}
         self._type_data = {"heavyTank": set(), "lightTank": set(), "mediumTank": set(), "AT-SPG": set(), "SPG": set()}
+        self._list_styles = dict()
         # ignore the variants by keywords. Maybe?
-        ignore_keyword = {"MapsTraining", "_bootcamp", "_FL", "_training", "_IGR", "_bot"}
+        ignore_keyword = {"MapsTraining", "_bootcamp", "_FL", "_training", "_IGR", "_bot", "_bob"}
         for vehicle_obj in list_every_vehicles:
             nation, tankprofilename = vehicle_obj.name.split(":")
             if(any(k in tankprofilename for k in ignore_keyword)):
@@ -68,6 +70,13 @@ class UML_MainGUI(UML_mainMeta):
                     self._type_data[typetag].add(tankprofilename)
             # name reference
             self._code_to_tank[tankprofilename] = vehicle_obj.userString
+            # self._vehicle_obj = vehicle_obj # keep a last vehicle obj to inspect
+            # if have more than 1 styles (default), add to concerning dict
+            possible_styles = list(vehicle_obj.hulls[0].modelsSets.keys())
+            possible_styles.remove('default')
+            if(len(possible_styles) > 0):
+                # print("[UML GUI] Cached style: {:s} - {}".format(tankprofilename, possible_styles))
+                self._list_styles[tankprofilename] = possible_styles
         # backward search from tank name to profilename
         self._tank_to_code = {name: key for key, name in self._code_to_tank.items()}
         # also update tier to str format (currently int)
@@ -113,7 +122,7 @@ class UML_MainGUI(UML_mainMeta):
             om_data = BigWorld.om
             return om_data
         else:
-            print("OM data not available ATM; resorting to default values.")
+            print("[UML GUI] OM data not available ATM; resorting to default values.")
             return None
     
     @staticmethod
@@ -132,7 +141,8 @@ class UML_MainGUI(UML_mainMeta):
                                 "useWhitelist": self.readValueFromSection(section, "useWhitelist", bool, sectionCtx=profileCtx, default=True),
                                 "whitelist": _multispace_regex.sub(" ", self.readValueFromSection(section, "whitelist", str, sectionCtx=profileCtx, default="")),
                                 "camouflageID": self.readValueFromSection(section, "camouflageID", int, sectionCtx=profileCtx, default=0),
-                                "paintID": self.readValueFromSection(section, "paintID", int, sectionCtx=profileCtx, default=0)
+                                "paintID": self.readValueFromSection(section, "paintID", int, sectionCtx=profileCtx, default=0),
+                                "styleSet": self.readValueFromSection(section, "styleSet", str, sectionCtx=profileCtx, default="0"),
                               })
             return configs
         else:
@@ -168,7 +178,7 @@ class UML_MainGUI(UML_mainMeta):
             try:
                 jsondata = json.loads(strconf)
             except Exception as e:
-                print("Error while parsing json: ", e)
+                print("[UML GUI] Error while parsing json: " + str(e))
                 return
             #print("Received object:", jsondata)
             #print("List available function: ", [func for func in dir(self.sectionMain) if callable(func)])
@@ -237,7 +247,7 @@ class UML_MainGUI(UML_mainMeta):
         try:
             return self._tank_to_code[name]
         except KeyError:
-            print("KeyError happened for tank name {:s}".format(name))
+            print("[UML GUI] KeyError happened for tank name {:s}".format(name))
             return "#Error#"
        
     def removeProfileAtPy(self, profilename):
@@ -247,7 +257,29 @@ class UML_MainGUI(UML_mainMeta):
     def loadCamoPaintDataFromPy(self):
         camoID, camoName = zip(*self._camo_list)
         paintID, paintName = zip(*self._paint_list)
-        return {"camoID": list(camoID), "paintID": list(paintID), "camoName": list(camoName), "paintName": list(camoName)}
+        return {"camoID": list(camoID), "paintID": list(paintID), "camoName": list(camoName), "paintName": list(paintName)}
+        
+    def getHangarVehicleFromPy(self):
+        # for fielddata in inspect.getmembers(g_currentVehicle.item.descriptor):
+        #    print("g_currentVehicle.item.descriptor :" + str(fielddata))
+        
+        try:
+            return g_currentVehicle.item.name.split(":")[-1].strip()
+        except Exception as e:
+            print("[UML GUI] Exception when trying to get vehicle profile name: {:s}. Raw name found before split: {:s}".format(str(e), g_currentVehicle.item.name))
+            return ""
+     
+    def getPossibleStyleOfProfileFromPy(self, profilename):
+        if(profilename in self._list_styles):
+            return ["No Style"] + self._list_styles[profilename]
+        else:
+            return None
+        
+    def debugEvalCommand(self, execCmd, evalCmd):
+        exec(execCmd)
+        result = eval(evalCmd)
+        print("[UML GUI] Debug: " + str(result))
+        return result
     
 """Add binding from the AS's UML_MainGUI class to the current python UML_MainGUI class"""
 g_entitiesFactories.addSettings(ViewSettings("UML_MainGUI", UML_MainGUI, 'UML_MainGUI.swf',

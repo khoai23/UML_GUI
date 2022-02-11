@@ -42,6 +42,7 @@ package uml
 	  public var remodels_filelist: TextInput;
 	  
 	  internal var isStatic: Boolean = true;
+	  internal var isDebug: Boolean = false;
 	  // dynamic scrollable list component
 	  public var profile_list : ScrollingListPx;
 	  // static click-to-move component
@@ -58,7 +59,10 @@ package uml
 	  public var current_profile_camo_help : LabelControl;
 	  public var current_profile_paint : DropdownMenu;
 	  public var current_profile_paint_help : LabelControl;
+	  public var current_profile_style : DropdownMenu;
+	  public var current_profile_style_help : LabelControl;
 	  public var delete_profile : SoundButtonEx;
+	  public var use_hangar_vehicle : SoundButtonEx;
 	  
 	  
 	  public var help_vehicle_selector : LabelControl;
@@ -70,11 +74,16 @@ package uml
 	// button to add to the profile list or whitelist.
 	  public var add_profile_btn : SoundButtonEx;
 	  public var add_whitelist_btn : SoundButtonEx;
-	  
+	 
+	  public var debug_exec_field : TextInput;
+	  public var debug_eval_field : TextInput;
+	  public var debug_btn : SoundButtonEx;
+	 
 	  // test
 	  //public var profileIcon : UILoaderAlt
 	  //protected var current_profile_index : Number = 0;
 	  protected var list_profile_objects : Array;
+	  protected var list_styles : Array = null;
 	  protected var camo_paint_data : Object;
 	  
       public var receiveStringConfigAtPy : Function = null; // this will receive config data from swf to python
@@ -84,6 +93,9 @@ package uml
 	  public var loadVehicleProfileFromPy : Function = null;	  // this will convert the proper name into the accompanying text input
 	  public var removeProfileAtPy : Function = null; // this will purge the profile on Python / XML end
 	  public var loadCamoPaintDataFromPy : Function = null; // this will load the needed data to camo/paint dropdown
+	  public var getHangarVehicleFromPy : Function = null; // this will retrieve the needed hangar vehicle to support addHangarVehicleToWhitelist
+	  public var getPossibleStyleOfProfileFromPy : Function = null; // this will retrieve the needed profile style from the vehicle obj.
+	  public var debugEvalCommand : Function = null; // eval and exec codes directly from GUI
 
 	  public function UML_MainGUI() {
 		 super();
@@ -131,18 +143,23 @@ package uml
 			// format: profile name (label) - enable - whitelist
 		   //this.profile_selector.dataProvider.invalidate();
 		   this.current_profile_name = createLabel("profile_placeholder", 35, 105);
+		   this.current_profile_name.width = 200;
 		   this.current_profile_name.autoSize = TextFieldAutoSize.LEFT;
 		   this.current_profile_name.toolTip = "The full name of the profile.";
-		   this.current_profile_target_help = createLabel("Enabled profiles:", 35 + 125, 105);
-		   this.current_profile_target = createTextInput("whitelist_placeholder", 35 + 225, 102);
+		   this.current_profile_target_help = createLabel("Enabled profiles:", 35 + 125, 105 + 20);
+		   this.current_profile_target = createTextInput("whitelist_placeholder", 35 + 225, 102 + 20);
 		   this.current_profile_enable = createCheckbox("Enabled", 35, 105 + 20);
-		   this.current_profile_swapNPC = createCheckbox("Model swap NPC", 35 + 125, 105 + 20);
-		   this.current_profile_camo_help = createLabel("Camouflage ID:", 35 + 125, 105 + 40);
+		   this.current_profile_swapNPC = createCheckbox("Model swap NPC", 35, 105 + 40);
 		   
+		   this.current_profile_camo_help = createLabel("Camouflage ID:", 35 + 125, 105 + 40);
 		   this.current_profile_camo = createDropdown(35 + 225, 102 + 40);
 		   this.current_profile_paint_help = createLabel("Paint ID:", 35 + 125, 105 + 60);
 		   this.current_profile_paint = createDropdown(35 + 225, 102 + 60);
-		   this.delete_profile = createButton("Delete this Profile", 35 + 175, 105 + 85, true);
+		   
+		   this.current_profile_style_help = createLabel("Style:", 35 + 125, 105 + 80);
+		   this.current_profile_style = createDropdown(35 + 225, 102 + 80);
+		   this.use_hangar_vehicle = createButton("Add hangar vehicle to Whitelist", 35 + 20, 105 + 105, true);
+		   this.delete_profile = createButton("Delete this Profile", 35 + 230, 105 + 105, true);
 		   this.populatePaintCamo();
 		   
 		   // adding appropriate listeners
@@ -156,7 +173,9 @@ package uml
 		    this.current_profile_target.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onWhitelistChange);
 		    this.current_profile_camo.addEventListener(ListEvent.INDEX_CHANGE, this.onCamoChange);
 		    this.current_profile_paint.addEventListener(ListEvent.INDEX_CHANGE, this.onPaintChange);
+			this.current_profile_style.addEventListener(ListEvent.INDEX_CHANGE, this.onStyleChange);
 			this.delete_profile.addEventListener(ButtonEvent.CLICK, this.removeProfile);
+			this.use_hangar_vehicle.addEventListener(ButtonEvent.CLICK, this.addHangarVehicleToWhitelist);
 			
 			// adding the concerning VehicleSelector panel
 			this.createVehicleSelector(35 + 385, 65);
@@ -169,6 +188,14 @@ package uml
 		   this.profile_list.selectedIndex = -1;
 		   this.profile_list.dataProvider.invalidate();
 		   this.profile_list.visible = true;
+		}
+		 
+		if(this.isDebug) {
+			// debug
+			this.debug_exec_field = createTextInput("debug_exec_field", 35 + 385 + 60, y + 200);
+			this.debug_eval_field = createTextInput("debug_eval_field", 35 + 385 + 60, y + 220);
+			this.debug_btn = createButton("Debug", 35 + 385 + 60, y + 245);
+			this.debug_btn.addEventListener(ButtonEvent.CLICK, this.sendDebugCmdFromAS);
 		}
 	  }
 	  
@@ -238,6 +265,10 @@ package uml
 			this.add_profile_btn.removeEventListener(ButtonEvent.CLICK, this.addNewProfile);
 			this.add_whitelist_btn.removeEventListener(ButtonEvent.CLICK, this.addProfileToWhitelist);
 		}
+		
+		if(this.isDebug) {
+			this.debug_btn.removeEventListener(ButtonEvent.CLICK, this.sendDebugCmdFromAS);
+		}
 		//this.profile_list.dataProvider.cleanUp();
 		//this.profile_list = null;
 		super.onDispose();
@@ -258,12 +289,12 @@ package uml
 	  
 	  internal function loadProfileAtCurrentIndex() : void {
 	    var current_idx : Number = this.profile_selector.selectedIndex;
-		//DebugUtils.LOG_WARNING("loadProfileAtCurrentIndex called for idx:" + String(current_idx));
 		// if topmost, disable backward; if at end, disable forward
 		this.backward_btn.enabled = current_idx > 0;
 		this.forward_btn.enabled = current_idx < (this.list_profile_objects.length-1);
 		// load respective data into components
 		var currentProfile : Object = this.list_profile_objects[current_idx];
+		//DebugUtils.LOG_WARNING("loadProfileAtCurrentIndex called for obj:" + String(currentProfile));
 		this.current_profile_name.text = currentProfile["name"];
 		this.current_profile_enable.selected = currentProfile["enabled"];
 		this.current_profile_swapNPC.selected = currentProfile["swapNPC"];
@@ -274,6 +305,7 @@ package uml
 		}
 		this.current_profile_camo.selectedIndex = this.camo_paint_data["camoID"].indexOf(currentProfile["camouflageID"]);
 		this.current_profile_paint.selectedIndex = this.camo_paint_data["paintID"].indexOf(currentProfile["paintID"]);
+		this.updateStyleOptionInAS(currentProfile["styleSet"], currentProfile["name"]);
 	  }
 	  
 	  internal function onSetEnableProfile() : void {
@@ -301,6 +333,14 @@ package uml
 	  
 	  internal function onPaintChange() : void {
 		this.list_profile_objects[this.profile_selector.selectedIndex]["paintID"] = this.camo_paint_data["paintID"][this.current_profile_paint.selectedIndex];
+	  }
+	  
+	  internal function onStyleChange() : void {
+	    if(this.current_profile_style.selectedIndex == 0) {
+			this.list_profile_objects[this.profile_selector.selectedIndex]["styleSet"] = "0";
+		} else {
+			this.list_profile_objects[this.profile_selector.selectedIndex]["styleSet"] = this.list_styles[this.current_profile_style.selectedIndex];
+		}
 	  }
 	  
 	  internal function loadVehiclesWithCriteriaToAS() : void {
@@ -338,22 +378,53 @@ package uml
 		this.removeProfileAtPy( this.list_profile_objects[remove_index]["name"] );
 		// remove on AS side 
 		this.list_profile_objects.splice(remove_index, 1);
-		this.reloadProfileSelector();
-		if(remove_index >= this.profile_selector.dataProvider.length) { // if the removed index is last, reset to first.TODO Maybe reset to last instead?
+		if(remove_index >= this.profile_selector.dataProvider.length) { // if the removed index is last, reset to first. TODO Maybe reset to last instead?
 			this.profile_selector.selectedIndex = 0;
 		}
+		this.reloadProfileSelector();
+		this.loadProfileAtCurrentIndex();
 	  }
 	  
-	  internal function addProfileToWhitelist() : void {
+	  internal function addProfileToWhitelist(event: Object, profile_text: String = null) : void {
 		// on clicking a vehicle within vehicle_selector, change the corresponding TextInput to the profile name
+		if(profile_text == null) {
+			profile_text = this.vehicle_profile_field.text;
+		}
 		var current_whitelist : String = StringUtil.trim(this.current_profile_target.text);
-		var profile_text : String = this.vehicle_profile_field.text;
+		// var profile_text : String =  (profile == null) ? this.vehicle_profile_field.text : profile; // if the profile is specified, use profile; else use the one in vehicle_profile_field
 		if(current_whitelist == "")
 			this.current_profile_target.text = profile_text;
 		else if(current_whitelist.indexOf(profile_text) < 0) // only add when profile not exist in whitelist
 			this.current_profile_target.text = current_whitelist + ", " + profile_text;
 		// call the update function for the focus out as well
 		this.onWhitelistChange();
+	  }
+	  
+	  internal function addHangarVehicleToWhitelist() : void {
+		// retrieve the hangar vehicle from Py side and add it to whitelist
+		this.addProfileToWhitelist(null, this.getHangarVehicleFromPy());
+	  }
+	  
+	  internal function updateStyleOptionInAS(style_index_or_name : String, profile_name : String = null) : void {
+	    if( profile_name == null ) { profile_name = this.current_profile_name.text; }
+		this.list_styles = this.getPossibleStyleOfProfileFromPy(profile_name);
+		// attempt to parse to number; if not true, try to search in list of possible styles; if not found there either, safeguard to 0 (No style)
+		// attempt to convert 
+		if(this.list_styles == null) {
+			// no style, disable the selector
+			this.current_profile_style.enabled = false;
+			this.current_profile_style.selectedIndex = -1;
+		} else {
+			// possible style, update the selector
+			var profile_idx : Number = Number(style_index_or_name);
+			if(isNaN(profile_idx)) {
+				profile_idx = this.list_styles.indexOf(style_index_or_name);
+				if(profile_idx == -1) profile_idx = 0;
+			}
+			this.current_profile_style.enabled = true;
+			this.current_profile_style.dataProvider = new DataProvider(this.list_styles);
+			this.current_profile_style.selectedIndex = profile_idx;
+		}
 	  }
 	  
 	  internal function addProfileAsParent(): void {
@@ -392,6 +463,10 @@ package uml
 		  // update current MOE rank; auto is -1 and goes from 0-3, therefore we can simply +1 before and after
 		  this.moe_selector.selectedIndex = dict["MOErank"] + 1;
       }
+	  
+	  public function sendDebugCmdFromAS() : void {
+		this.debugEvalCommand(this.debug_exec_field.text, this.debug_eval_field.text)
+	  }
 	  
 	  internal function createCheckbox(label: String, x: Number, y: Number) : CheckBox {
 		return addChild(App.utils.classFactory.getComponent("CheckBox", CheckBox, { "x": x, "y": y, "label": label, "selected": false })) as CheckBox;

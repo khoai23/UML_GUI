@@ -5,6 +5,7 @@ from items.customizations import CustomizationOutfit, CamouflageComponent, Decal
 from items.components.c11n_constants import ApplyArea
 from vehicle_outfit.outfit import Outfit
 import BigWorld
+import ResMgr
 
 import os, io
 
@@ -28,6 +29,26 @@ def new_prepareOutfit(self, outfitCD):
 CompoundAppearance._prepareOutfit = new_prepareOutfit
 """
 
+def tryLoadIntValue(section, valueName):
+    """Try load tuple of int; if failed, load single int; if failed, return default (0)"""
+    stringValue = section.readString(valueName, "")
+    if(stringValue == ""):
+        return 0
+    try:
+        if("," in stringValue):
+            return tuple([int(v.strip()) for v in stringValue.split(",")])
+        else:
+            return int(stringValue)
+    except ValueError:
+        print("Error @replaceOwnEmblem: can't convert value {}".format(stringValue))
+    return 0
+
+def loadSettingFromXML(ownModelPath="scripts/client/mods/ownModel.xml"):
+    """Update fields: OM.player.forcedEmblem (int or (int, int)); OM.player.forcedCamouflage (int or (int, int, int))"""
+    # playerObject, alliedObject, enemyObject = [object() for _ in range(3)]
+    sectionMain = ResMgr.openSection(ownModelPath)
+    playerForcedEmblem = tryLoadIntValue(sectionMain, "player/forcedEmblem")
+
 BigWorld.forcedEmblem = None
 
 def tryGetPersonalDecal(ownModelPath="scripts/client/mods/ownModel.xml", personalDecalPath="forcedEmblem.txt"):
@@ -37,12 +58,13 @@ def tryGetPersonalDecal(ownModelPath="scripts/client/mods/ownModel.xml", persona
             personal_emblem_idx = BigWorld.om.forcedEmblem
         else:
             sectionMain = ResMgr.openSection(ownModelPath)
-            personal_emblem_idx = BigWorld.om.forcedEmblem = sectionMain.readInt(valuename, None)
-            sectionMain.close()
+            personal_emblem_idx = BigWorld.om.forcedEmblem = sectionMain.readInt("forcedEmblem", -1)
+            if(personal_emblem_idx == -1): # cant use none, whatthehell
+                BigWorld.om.forcedEmblem = None
     elif(BigWorld.forcedEmblem or os.path.isfile(personalDecalPath)):
         if(BigWorld.forcedEmblem == -1):
             # this is when we read an invalid index as an emblem; we do not reopen the file
-            pass
+            personal_emblem_idx = None
         elif(BigWorld.forcedEmblem is None):
             # this is when the emblem is uninitiated; we open the file and record the value
             with io.open(personalDecalPath, "r") as df:

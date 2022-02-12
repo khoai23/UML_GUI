@@ -44,7 +44,11 @@ class UML_MainGUI(UML_mainMeta):
         self.sectionMainModel =  _xml.getChildren(ctx, self.sectionMain, 'models')
         
         self.metakey = {"remodelsFilelist" : "configLib"} # keys that will be written to sectionMeta
-        self.mainkey = {"affectHangar":"affectHangar", "useUMLSound":"useUMLSound", "MOErank": "MOE_rank"} # keys that will be written to sectionMain
+        self.mainkey = {"affectHangar":"affectHangar", 
+                        "useUMLSound":"useUMLSound", 
+                        "MOErank": "MOE_rank",
+                        "forcedEmblem": "forcedEmblem"
+                       } # keys that will be written to sectionMain
         
         # self.dumpCamouflageData()
         
@@ -213,6 +217,7 @@ class UML_MainGUI(UML_mainMeta):
         config['affectHangar'] = getattr(om, 'affectHangar', False)
         config['useUMLSound'] = getattr(om, 'useUMLSound', False)
         config['MOErank'] = getattr(om, 'MOErank', -1)
+        config['forcedEmblem'] = getattr(om, 'forcedEmblem', 0)
         # convert later
         config['listProfileObjects'] = self.retrieveProfileSettings(self.sectionMainModel)
         config['remodelsFilelist'] = self.readValueFromSection(self.sectionMeta, "configLib", str, sectionCtx=None, default="placeholder_list_of_libs")

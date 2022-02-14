@@ -42,7 +42,6 @@ package uml
 	  public var remodels_filelist: TextInput;
 	  
 	  internal var isStatic: Boolean = true;
-	  internal var isDebug: Boolean = false;
 	  // dynamic scrollable list component
 	  public var profile_list : ScrollingListPx;
 	  // static click-to-move component
@@ -86,13 +85,14 @@ package uml
 	  protected var list_styles : Array = null;
 	  protected var camo_paint_data : Object;
 	  
+	  public var getIsDebugUMLFromPy : Function = null; // this will get UML's debug to decide showing debug fields (eval, exec) or not
       public var receiveStringConfigAtPy : Function = null; // this will receive config data from swf to python
 	  public var getStringConfigFromPy : Function = null;	// this will get config data from python to swf
 	  public var getVehicleSelectorDataFromPy : Function = null; // this will get permanent vehicle categories (nation, class, tier)
 	  public var loadVehiclesWithCriteriaFromPy : Function = null; // this will load the list of vehicles fitting the filter above
 	  public var loadVehicleProfileFromPy : Function = null;	  // this will convert the proper name into the accompanying text input
 	  public var removeProfileAtPy : Function = null; // this will purge the profile on Python / XML end
-	  public var loadCamoPaintDataFromPy : Function = null; // this will load the needed data to camo/paint dropdown
+	  public var loadCustomizationDataFromPy : Function = null; // this will load the needed data to camo/paint dropdown
 	  public var getHangarVehicleFromPy : Function = null; // this will retrieve the needed hangar vehicle to support addHangarVehicleToWhitelist
 	  public var getPossibleStyleOfProfileFromPy : Function = null; // this will retrieve the needed profile style from the vehicle obj.
 	  public var debugEvalCommand : Function = null; // eval and exec codes directly from GUI
@@ -190,7 +190,7 @@ package uml
 		   this.profile_list.visible = true;
 		}
 		 
-		if(this.isDebug) {
+		if(this.getIsDebugUMLFromPy()) { 
 			// debug
 			this.debug_exec_field = createTextInput("debug_exec_field", 35 + 385 + 60, y + 200);
 			this.debug_eval_field = createTextInput("debug_eval_field", 35 + 385 + 60, y + 220);
@@ -200,7 +200,7 @@ package uml
 	  }
 	  
 	  internal function populatePaintCamo() : void {
-		this.camo_paint_data = this.loadCamoPaintDataFromPy();
+		this.camo_paint_data = this.loadCustomizationDataFromPy();
 		// update with Remove & No change (-1, 0)
 		this.camo_paint_data["camoName"].unshift("Remove", "No change");
 		this.camo_paint_data["paintName"].unshift("Remove", "No change");
@@ -266,7 +266,7 @@ package uml
 			this.add_whitelist_btn.removeEventListener(ButtonEvent.CLICK, this.addProfileToWhitelist);
 		}
 		
-		if(this.isDebug) {
+		if(this.getIsDebugUMLFromPy()) {
 			this.debug_btn.removeEventListener(ButtonEvent.CLICK, this.sendDebugCmdFromAS);
 		}
 		//this.profile_list.dataProvider.cleanUp();

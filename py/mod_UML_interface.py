@@ -19,6 +19,14 @@ import inspect
 
 __all__ = ('UML_main', )
 
+def getTextureFilename(tfn):
+    # should have slash at front and dot at back
+    if(r"/" in tfn):
+        tfn = tfn.split(r"/")[-1]
+    if(r"." in tfn):
+        tfn = tfn.split(".")[0]
+    return tfn
+
 class UML_mainMeta(AbstractWindowView):
     def onWindowClose(self):
         print("onWindowClose called")
@@ -95,6 +103,9 @@ class UML_MainGUI(UML_mainMeta):
         # sanitize - if userString is blank, replace with formatted unknown
         self._camo_list = [(k, n if n != "" else "Unknown (ID {:d})".format(k)) for k, n in self._camo_list ]
         self._paint_list = [(k, n if n != "" else "Unknown (ID {:d})".format(k)) for k, n in self._paint_list ]
+        
+        # Construct decal data for replaceOwnCustomization similarly; falling back to texturename when description available
+        self._decal_list = [(k, v.userString if v.userString != "" else getTextureFilename(v.texture)) for k, v in vehicles.g_cache.customization20().decals.items()]
 
     def printObjToLog(self, obj):
         print("printObjToLog, obj found: ", obj, type(obj))
@@ -259,10 +270,13 @@ class UML_MainGUI(UML_mainMeta):
         profilexmlname = 'models/' + profilename
         self.sectionMain.deleteSection(profilexmlname)
     
-    def loadCamoPaintDataFromPy(self):
+    def loadCustomizationDataFromPy(self):
         camoID, camoName = zip(*self._camo_list)
         paintID, paintName = zip(*self._paint_list)
-        return {"camoID": list(camoID), "paintID": list(paintID), "camoName": list(camoName), "paintName": list(paintName)}
+        decalID, decalName = zip(*self._decal_list)
+        return {"camoID": list(camoID), "paintID": list(paintID), "decalID": list(decalID), 
+                "camoName": list(camoName), "paintName": list(paintName), "decalName": list(decalName)
+               }
         
     def getHangarVehicleFromPy(self):
         # for fielddata in inspect.getmembers(g_currentVehicle.item.descriptor):

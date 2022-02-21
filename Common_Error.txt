@@ -19,7 +19,7 @@ Making SWF:
 Compile the python binding with compileall
 C:\Python27\python.exe -m compileall py\mod_UML_interface.py
 
-Compile the swf, with its external swc(s) are found in gui-part1/2.pkg; stand in `as3` folder
+Compile the swf, with its external swc(s) are found in gui-part1/2.pkg; stand in `root` folder (you should see the `as3` folder)
 D:\Archive\flex_sdk_4.6.0.23201B\bin\mxmlc  -compiler.source-path=as3 -compiler.external-library-path+=as3\lib\common-1.0-SNAPSHOT.swc,as3\lib\gui_base-1.0-SNAPSHOT.swc -static-link-runtime-shared-libraries=true -o as3\UML_MainGUI.swf as3\uml\UML_MainGUI.as
 ..\flex_sdk_4.6.0.23201B\bin\mxmlc.bat  -compiler.source-path=as3 -compiler.external-library-path+=as3\lib\common-1.0-SNAPSHOT.swc,as3\lib\gui_base-1.0-SNAPSHOT.swc -static-link-runtime-shared-libraries=true -o as3\UML_MainGUI.swf as3\uml\UML_MainGUI.as
 If installed in Windows 64bit, consider using the mxmlc.bat trick if encountering "Could not find JVM". Content of it should be:
@@ -54,3 +54,9 @@ AO map:
 OTHER:
 Soviet sticker: 15924, 15872, 15877 looks great; 15926 is a plain, faded white star
 Vietnam sticker: 410 is flag, 38 is armored flag
+
+Prefered camos:
+513, 512, 514 (large spots); 555, 554, 556 (7th aniv); 634, 635, 636 (Expeditionary)
+	Summer independent: 638 (Homeland), 660 (1st Guard), 576 (Fire Bulge), 
+	Winter independent: 635 (Glass), 623 (Alfa), 622 (Btl Moscow), 598 (Hunt Silver), 560 (Western Front), 387 (Black Marble)
+	Desert independent: 618 (Thanksgiving), 553 (Four tone floral), 299 (Lancelot)

@@ -1,33 +1,18 @@
 import types
 from vehicle_systems.CompoundAppearance import CompoundAppearance
 from vehicle_systems import camouflages
-from items.customizations import CustomizationOutfit, CamouflageComponent, DecalComponent
-from items.components.c11n_constants import ApplyArea
+from items.customizations import CustomizationOutfit, CamouflageComponent, PaintComponent, DecalComponent
+from items.components.c11n_constants import ApplyArea, SeasonType
 from vehicle_outfit.outfit import Outfit
+from items import vehicles
+from gui.hangar_vehicle_appearance import HangarVehicleAppearance
 import BigWorld
 import ResMgr
 
 import os, io
+import random
+import json
 
-# BigWorld.injector_LastCompoundAppearance = None
-# BigWorld.injector_LastOutfitCD = None
-
-# decal_idx = 38 # try replace armored flag on both
-"""old_applyVehicleOutfit = CompoundAppearance._CompoundAppearance__applyVehicleOutfit
-def new_applyVehicleOutfit(self):
-    print("[Injector] _applyVehicleOutfit called, setting to default.")
-    BigWorld.injector_LastCompoundAppearance = self
-    return old_applyVehicleOutfit(self)
-CompoundAppearance._CompoundAppearance__applyVehicleOutfit = new_applyVehicleOutfit"""
-
-# this function seems only to work in battle.
-"""old_prepareOutfit = CompoundAppearance._prepareOutfit
-def new_prepareOutfit(self, outfitCD):
-    print("[Injector] _prepareOutfit called, setting to no outfit for everyone.")
-    return Outfit(CustomizationOutfit().makeCompDescr())
-    return old_prepareOutfit(self, outfitCD)
-CompoundAppearance._prepareOutfit = new_prepareOutfit
-"""
 BigWorld.forcedCustomizationDict = getattr(BigWorld, "forcedCustomizationDict", dict())
 
 def tryLoadIntValue(section, valueName, stringValue=None, tupleSizeCheck=None):
@@ -52,11 +37,26 @@ def tryLoadIntValue(section, valueName, stringValue=None, tupleSizeCheck=None):
         return 0
     return None
 
+        
+def checkCustomizationID(id, customization_sets):
+    # sets should be from vehicle_cache objs
+    if(isinstance(id, int)):
+        return id if any(cst == id for cst in customization_sets) else 0
+    elif(isinstance(id, (tuple, list))):
+        return tuple([checkCustomizationID(subid, customization_sets) for subid in id])
+    elif(id in [None, 0, -1]): # special values
+        return id
+    else:
+        raise ValueError("Invalid input type: {} {}".format(id, type(id)))
+        
+def applyInHangar():
+    # ignore by default or binded to UML's affectHangar
+    return getattr(getattr(BigWorld, "om", None), "affectHangar", False)
+        
 def loadSettingFromOMConfig(ownModelPath="scripts/client/mods/ownModel.xml"):
-    """Update fields: OM.playerForcedEmblem (int or (int, int)); similar for allied/enemy"""
-    # playerObject, alliedObject, enemyObject = [object() for _ in range(3)]
+    """Update fields in OM file to forcedCustomizationDict"""
     sectionMain = ResMgr.openSection(ownModelPath)
-    # emblem idx
+    # fields: OM.player.forcedEmblem (int or (int, int)), maximum override both emblems sequentially
     playerForcedEmblem = tryLoadIntValue(sectionMain, "player/forcedEmblem", tupleSizeCheck=2)
     allyForcedEmblem = tryLoadIntValue(sectionMain, "ally/forcedEmblem", tupleSizeCheck=2)
     enemyForcedEmblem = tryLoadIntValue(sectionMain, "enemy/forcedEmblem", tupleSizeCheck=2)
@@ -64,57 +64,113 @@ def loadSettingFromOMConfig(ownModelPath="scripts/client/mods/ownModel.xml"):
     playerForcedBothEmblem = sectionMain.readBool("player/forcedBothEmblem", False)
     allyForcedBothEmblem = sectionMain.readBool("ally/forcedBothEmblem", False)
     enemyForcedBothEmblem = sectionMain.readBool("enemy/forcedBothEmblem", False)
-    print("Loaded values @replaceOwnCustomization: {} {} {}".format(playerForcedEmblem, allyForcedEmblem, enemyForcedEmblem))
+    # fields: OM.player.forcedCamo (int or (int, int, int)), either one camo for all or (summer, winter, desert)
+    playerForcedCamo = tryLoadIntValue(sectionMain, "player/forcedCamo", tupleSizeCheck=3)
+    allyForcedCamo = tryLoadIntValue(sectionMain, "ally/forcedCamo", tupleSizeCheck=3)
+    enemyForcedCamo = tryLoadIntValue(sectionMain, "enemy/forcedCamo", tupleSizeCheck=3)
+    # fields: OM.player.forcedPaint (int or (int, int, int)), either one camo for all or (summer, winter, desert)
+    playerForcedPaint = tryLoadIntValue(sectionMain, "player/forcedPaint", tupleSizeCheck=3)
+    allyForcedPaint = tryLoadIntValue(sectionMain, "ally/forcedPaint", tupleSizeCheck=3)
+    enemyForcedPaint = tryLoadIntValue(sectionMain, "enemy/forcedPaint", tupleSizeCheck=3)
+    
+    # check every values with corresponding cache
+    emblemSet = playerForcedEmblem, allyForcedEmblem, enemyForcedEmblem = [checkCustomizationID(v, vehicles.g_cache.customization20().decals.keys()) for v in (playerForcedEmblem, allyForcedEmblem, enemyForcedEmblem) ]
+    camoSet = playerForcedCamo, allyForcedCamo, enemyForcedCamo = [checkCustomizationID(v, vehicles.g_cache.customization20().camouflages.keys()) for v in (playerForcedCamo, allyForcedCamo, enemyForcedCamo) ]
+    paintSet = playerForcedPaint, allyForcedPaint, enemyForcedPaint = [checkCustomizationID(v, vehicles.g_cache.customization20().paints.keys()) for v in (playerForcedPaint, allyForcedPaint, enemyForcedPaint) ]
+    print("Loaded values @replaceOwnCustomization [XML]: {} {} {}".format(emblemSet, camoSet, paintSet))
     
     BigWorld.forcedCustomizationDict.update(playerForcedEmblem=playerForcedEmblem, allyForcedEmblem=allyForcedEmblem, enemyForcedEmblem=enemyForcedEmblem,
-                                            playerForcedBothEmblem=playerForcedBothEmblem, allyForcedBothEmblem=allyForcedBothEmblem, enemyForcedBothEmblem=enemyForcedBothEmblem)
+                                            playerForcedBothEmblem=playerForcedBothEmblem, allyForcedBothEmblem=allyForcedBothEmblem, enemyForcedBothEmblem=enemyForcedBothEmblem,
+                                            playerForcedCamo=playerForcedCamo, allyForcedCamo=allyForcedCamo, enemyForcedCamo=enemyForcedCamo,
+                                            playerForcedPaint=playerForcedPaint, allyForcedPaint=allyForcedPaint, enemyForcedPaint=enemyForcedPaint
+                                           )
 
 # keep a reference to work with UML GUI
 BigWorld.forcedCustomizationDict["UML_reload_func"] = loadSettingFromOMConfig
 
 def loadSettingFromText(textPath="forcedEmblem.txt"):
     with io.open(personalDecalPath, "r") as df:
-        lines = [l.strip() for l in df.readlines()]
-        playerForcedEmblem, allyForcedEmblem, enemyForcedEmblem = [tryLoadIntValue(None, None, stringValue=l, tupleSizeCheck=2) for l in lines[:3]]
-        playerForcedBothEmblem, allyForcedBothEmblem, enemyForcedBothEmblem = [v.strip().lower() in ["enable", "enabled", "true"] for v in lines[3:]]
+        try:
+            """lines = [l.strip() for l in df.readlines()]
+            playerForcedEmblem, allyForcedEmblem, enemyForcedEmblem = [tryLoadIntValue(None, None, stringValue=l, tupleSizeCheck=2) for l in lines[:3]]
+            playerForcedBothEmblem, allyForcedBothEmblem, enemyForcedBothEmblem = [v.strip().lower() in ["enable", "enabled", "true"] for v in lines[3:6]]
+            playerForcedCamo, allyForcedCamo, enemyForcedCamo = [tryLoadIntValue(None, None, stringValue=l, tupleSizeCheck=3) for l in lines[6:9]]
+            playerForcedPaint, allyForcedPaint, enemyForcedPaint = [tryLoadIntValue(None, None, stringValue=l, tupleSizeCheck=3) for l in lines[9:12]]"""
+            data = json.load(df)
+        except JSONDecodeError as e:
+            print("Failed parsing json data: Error: {}".format(e))
+        playerForcedEmblem, allyForcedEmblem, enemyForcedEmblem = data.get("forcedEmblem", (None, None, None))
+        playerForcedBothEmblem, allyForcedBothEmblem, enemyForcedBothEmblem = data.get("forcedBothEmblem", (False, False, False))
+        playerForcedCamo, allyForcedCamo, enemyForcedCamo = data.get("forcedCamo", (None, None, None))
+        playerForcedPaint, allyForcedPaint, enemyForcedPaint = data.get("forcedPaint", (None, None, None))
+    
+    # check every values with corresponding cache
+    emblemSet = playerForcedEmblem, allyForcedEmblem, enemyForcedEmblem = [checkCustomizationID(v, vehicles.g_cache.customization20().decals.keys()) for v in (playerForcedEmblem, allyForcedEmblem, enemyForcedEmblem) ]
+    camoSet = playerForcedCamo, allyForcedCamo, enemyForcedCamo = [checkCustomizationID(v, vehicles.g_cache.customization20().camouflages.keys()) for v in (playerForcedCamo, allyForcedCamo, enemyForcedCamo) ]
+    paintSet = playerForcedPaint, allyForcedPaint, enemyForcedPaint = [checkCustomizationID(v, vehicles.g_cache.customization20().paints.keys()) for v in (playerForcedPaint, allyForcedPaint, enemyForcedPaint) ]
+    print("Loaded values @replaceOwnCustomization [JSON]: {} {} {}".format(emblemSet, camoSet, paintSet))
     
     BigWorld.forcedCustomizationDict.update(playerForcedEmblem=playerForcedEmblem, allyForcedEmblem=allyForcedEmblem, enemyForcedEmblem=enemyForcedEmblem,
-                                            playerForcedBothEmblem=playerForcedBothEmblem, allyForcedBothEmblem=allyForcedBothEmblem, enemyForcedBothEmblem=enemyForcedBothEmblem)
+                                            playerForcedBothEmblem=playerForcedBothEmblem, allyForcedBothEmblem=allyForcedBothEmblem, enemyForcedBothEmblem=enemyForcedBothEmblem,
+                                            playerForcedCamo=playerForcedCamo, allyForcedCamo=allyForcedCamo, enemyForcedCamo=enemyForcedCamo,
+                                            playerForcedPaint=playerForcedPaint, allyForcedPaint=allyForcedPaint, enemyForcedPaint=enemyForcedPaint
+                                           )
 
 TYPE_SELF, TYPE_ALLY, TYPE_ENEMY = "self", "ally", "enemy"
-TYPE_LOOKUP = {TYPE_SELF: "playerForcedEmblem", TYPE_ALLY: "allyForcedEmblem", TYPE_ENEMY: "enemyForcedEmblem"}
+DECAL_TYPE_LOOKUP = {TYPE_SELF: "playerForcedEmblem", TYPE_ALLY: "allyForcedEmblem", TYPE_ENEMY: "enemyForcedEmblem"}
 FORCED_BOTH_LOOKUP = {TYPE_SELF: "playerForcedBothEmblem", TYPE_ALLY: "allyForcedBothEmblem", TYPE_ENEMY: "enemyForcedBothEmblem"}
-def tryGetDecal(vehicleType, ownModelPath="scripts/client/mods/ownModel.xml", personalDecalPath="forcedEmblem.txt"):
+def tryGetDecal(vehicleType, ownModelPath="scripts/client/mods/ownModel.xml", personalConfigPath="mods/configs/replaceOwnCustomization.json"):
     """Attempt to load and get decal index either OM or a set file."""
-    decalIndexName = TYPE_LOOKUP[vehicleType]
+    decalIndexName = DECAL_TYPE_LOOKUP[vehicleType]
     if decalIndexName not in BigWorld.forcedCustomizationDict:
         # unloaded (these fields always have value after loads)
         if hasattr(BigWorld, "om"): # load from UML config
             loadSettingFromOMConfig(ownModelPath=ownModelPath)
-        elif(os.path.isfile(personalDecalPath)):
-            loadSettingFromText(textPath=personalDecalPath)
+        elif(os.path.isfile(personalConfigPath)):
+            loadSettingFromText(textPath=personalConfigPath)
         else:
-            print("Warning @replaceOwnCustomization: Neither UML nor text config(searched at {:s}) detected. The mod will do nothing.".format(personalDecalPath))
+            print("Warning @replaceOwnCustomization: Neither UML nor text config(searched at {:s}) detected. The mod will do nothing.".format(personalConfigPath))
             BigWorld.forcedCustomizationDict.update(playerForcedEmblem=None, allyForcedEmblem=None, enemyForcedEmblem=None,
-                                            playerForcedBothEmblem=False, allyForcedBothEmblem=False, enemyForcedBothEmblem=False)
+                                            playerForcedBothEmblem=False, allyForcedBothEmblem=False, enemyForcedBothEmblem=False,
+                                            playerForcedCamo=None, allyForcedCamo=None, enemyForcedCamo=None,
+                                            playerForcedPaint=None, allyForcedPaint=None, enemyForcedPaint=None
+                                                    )
     # after load, this always return values
     return BigWorld.forcedCustomizationDict[decalIndexName]
 
-
-old_prepareBattleOutfit = camouflages.prepareBattleOutfit
-def new_prepareBattleOutfit(outfitCD, vehicleDescriptor, vehicleId):
-    vehicleCD = vehicleDescriptor.makeCompactDescr()
-    player = BigWorld.player()
-    outfitComponent = camouflages.getOutfitComponent(outfitCD, vehicleDescriptor)
-    # INJECTION HERE
-    # vehicle type
-    if BigWorld.player().playerVehicleID == vehicleId:
-        vehicleType = TYPE_SELF # is own vehicle
-    elif(BigWorld.player().team == BigWorld.player().arena.vehicles.get(vehicleId, {}).get('team', 1)): 
-        vehicleType = TYPE_ALLY # is allied vehicle
+CAMO_TYPE_LOOKUP = {TYPE_SELF: "playerForcedCamo", TYPE_ALLY: "allyForcedCamo", TYPE_ENEMY: "enemyForcedCamo"}
+PAINT_TYPE_LOOKUP = {TYPE_SELF: "playerForcedPaint", TYPE_ALLY: "allyForcedPaint", TYPE_ENEMY: "enemyForcedPaint"}
+WEATHER_LOOKUP = {SeasonType.SUMMER: 0, SeasonType.WINTER: 1, SeasonType.DESERT: 2}
+def getCamoOrPaint(vehicleType, type_dict=CAMO_TYPE_LOOKUP, returnRandomSeason=True):
+    # this is always AFTER tryGetDecal; hence no more needs to load any setting
+    # if load camo, use CAMO_TYPE_LOOKUP; if load paint, use PAINT_TYPE_LOOKUP
+    camo_idx = BigWorld.forcedCustomizationDict[type_dict[vehicleType]]
+    if(camo_idx is None):
+        return 0 # None is equal to 0
+    elif(isinstance(camo_idx, int)):
+        # single camo type for all, no need for any other check
+        return camo_idx
+    season = camouflages._currentMapSeason()
+    if(season in WEATHER_LOOKUP.keys()):
+        # found valid season, use correct camo type
+        return camo_idx[WEATHER_LOOKUP[season]]
     else:
-        vehicleType = TYPE_ENEMY # is enemy vehicle
-    # override (in battle only; when the decal value is not None or 0)
+        # invalid season e.g Event; return a random season if flag is enabled; or 0 if disabled
+        return camo_idx[random.randint(len(camo_idx))] if returnRandomSeason else 0
+
+def modifyOutfitComponent(outfitComponent, vehicleId=None):
+    # INJECTION HERE
+    # vehicle type (player, ally, enemy) 
+    if vehicleId is None:
+        # vehicle call from __reload (hangar)
+        vehicleType = TYPE_SELF
+    if BigWorld.player().playerVehicleID == vehicleId:
+        vehicleType = TYPE_SELF # is own vehicle (arena)
+    elif(BigWorld.player().team == BigWorld.player().arena.vehicles.get(vehicleId, {}).get('team', 1)): 
+        vehicleType = TYPE_ALLY # is allied vehicle (arena)
+    else:
+        vehicleType = TYPE_ENEMY # is enemy vehicle (arena)
+    # override decals (in battle only; when the decal value is not None or 0)
     if tryGetDecal(vehicleType):
         if(BigWorld.forcedCustomizationDict[FORCED_BOTH_LOOKUP[vehicleType]] and len(outfitComponent.decals) < 2):
             # add in turret regions. They don't need to have values, since the ids are overwritten anyway
@@ -123,27 +179,90 @@ def new_prepareBattleOutfit(outfitCD, vehicleDescriptor, vehicleId):
             outfitComponent.decals.append(DecalComponent(id=-1, appliedTo=ApplyArea.TURRET_1))
         decal_idx = tryGetDecal(vehicleType)
         if(isinstance(decal_idx, tuple)):
-            # replace both using matching. # TODO account for disabled (-1)
+            # replace both using matching.
             for decal_item, new_idx in zip(outfitComponent.decals, decal_idx):
                 if(new_idx != 0): # ignore zero
                     decal_item.id = new_idx
         else:
-            # replace both using one # TODO account for disabled (-1)
+            # replace both using one
             for decal_item in outfitComponent.decals:
                 decal_item.id = decal_idx
+        # remove nonpositive ids (for -1, but can also deal with errant -2)
+        del [d for d in outfitComponent.decals if d.id <= 0][:]
+    # override camo (also in battle only)
+    if getCamoOrPaint(vehicleType, type_dict=CAMO_TYPE_LOOKUP):
+        camo_idx = getCamoOrPaint(vehicleType, type_dict=CAMO_TYPE_LOOKUP)
+        del outfitComponent.camouflages[:]
+        if(camo_idx > 0): # -1 will disable camo
+            outfitComponent.camouflages.extend([CamouflageComponent(id=camo_idx, appliedTo=area) for area in (ApplyArea.HULL, ApplyArea.TURRET, ApplyArea.GUN)])
+    # override paint (also in battle only)
+    if getCamoOrPaint(vehicleType, type_dict=PAINT_TYPE_LOOKUP):
+        paint_idx = getCamoOrPaint(vehicleType, type_dict=PAINT_TYPE_LOOKUP)
+        del outfitComponent.paints[:]
+        if(paint_idx > 0): # -1 will disable paint
+            outfitComponent.paints.extend([PaintComponent(id=paint_idx, appliedTo=area) for area in (ApplyArea.HULL, ApplyArea.TURRET, ApplyArea.GUN)])
+        
     # INJECTION FINISHED
-    outfit = Outfit(component=outfitComponent, vehicleCD=vehicleCD)
-    forceHistorical = player.playerVehicleID != vehicleId and player.customizationDisplayType < outfit.customizationDisplayType()
-    if outfit.style and (outfit.style.isProgression or camouflages.IS_EDITOR):
-        progressionOutfit = camouflages.getStyleProgressionOutfit(outfit, toLevel=outfit.progressionLevel)
-        if progressionOutfit is not None:
-            outfit = progressionOutfit
-    return outfit
+    return outfitComponent
+
+old_prepareBattleOutfit = camouflages.prepareBattleOutfit
+def new_prepareBattleOutfit(outfitCD, vehicleDescriptor, vehicleId):
+    outfit = old_prepareBattleOutfit(outfitCD, vehicleDescriptor, vehicleId)
+    outfit_new_components = modifyOutfitComponent(outfit.pack(), vehicleId)
+    return Outfit(component=outfit_new_components, vehicleCD=outfit.vehicleCD)
+    
 camouflages.prepareBattleOutfit = new_prepareBattleOutfit
 
+"""old_reload_HangarVehicleAppearance = HangarVehicleAppearance.__reload
+def new_reload_HangarVehicleAppearance(self, vDesc, vState, outfit):
+    old_reload_HangarVehicleAppearance(self, vDesc, vState, outfit)
+    if(applyInHangar()):
+        # only run overriding outfit when flag is enabled
+        outfit_new_components = modifyOutfitComponent(outfit.pack(), None)
+        return Outfit(component=outfit_new_components, vehicleCD=outfit.vehicleCD)
+# HangarVehicleAppearance.__reload = new_reload_HangarVehicleAppearance
+"""
 
 # No longer used (prototype concept test)
-"""def tryGetPersonalDecal(ownModelPath="scripts/client/mods/ownModel.xml", personalDecalPath="forcedEmblem.txt"):
+"""
+
+old_prepareOutfit = CommonTankAppearance._prepareOutfit 
+def new_prepareOutfit(self, outfitCD):
+    outfitComponent = camouflages.getOutfitComponent(outfitCD)
+    
+    # INJECTION HERE
+    if hasattr(BigWorld, "om") and not BigWorld.om.affectHangar:
+        return outfit
+    if BigWorld.forcedCustomizationDict["playerForcedEmblem"]:
+        if BigWorld.forcedCustomizationDict["playerForcedBothEmblem"]:
+            if len(outfit.decals) < 1:
+                outfit.decals.append(DecalComponent(id=-1, appliedTo=ApplyArea.TURRET))
+            outfit.decals.append(DecalComponent(id=-1, appliedTo=ApplyArea.TURRET_2))
+        decal_idx = BigWorld.forcedCustomizationDict["playerForcedEmblem"]
+        if(isinstance(decal_idx, tuple)):
+        for new_idx, decal_item in zip(decal_idx, outfit.decals):
+            decal_item.id = new_idx
+        else:
+            for decal_item in outfit.decals:
+                decal_item.id = decal_idx
+        # remove nonpositive ids
+        del [d for d in outfit.decals if d.id <= 0]
+    if BigWorld.forcedCustomizationDict["playerForcedCamo"]:
+        camo_idx = BigWorld.forcedCustomizationDict["playerForcedCamo"]
+        del outfit.camouflages[:]
+        if(camo_idx > 0): # -1 is disabled
+            outfit.camouflages.extend([CamouflageComponent(id=camo_idx, appliedTo=area) for area in (ApplyArea.GUN, ApplyArea.TURRET, ApplyArea.HULL)])
+    if BigWorld.forcedCustomizationDict["playerForcedPaint"]:
+        paint_idx = BigWorld.forcedCustomizationDict["playerForcedPaint"]
+        del outfit.paints[:]
+        if(paint_idx > 0): # -1 is disabled
+            outfit.paints.extend([PaintComponent(id=paint_idx, appliedTo=area) for area in (ApplyArea.GUN, ApplyArea.TURRET, ApplyArea.HULL)])
+    # INJECTION FINISHED
+    
+    return Outfit(component=outfitComponent, vehicleCD=self.typeDescriptor.makeCompactDescr())
+CommonTankAppearance._prepareOutfit = new_prepareOutfit
+
+def tryGetPersonalDecal(ownModelPath="scripts/client/mods/ownModel.xml", personalDecalPath="forcedEmblem.txt"):
     #Attempt to get personal decal from either OM or a set file.
     if(hasattr(BigWorld, "om")):
         if(hasattr(BigWorld.om, "forcedEmblem")):

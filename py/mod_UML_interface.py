@@ -11,6 +11,7 @@ import ResMgr
 from CurrentVehicle import g_currentVehicle, g_currentPreviewVehicle
 from items import vehicles, _xml
 import nations
+from items.components.c11n_constants import SeasonType
 
 import json
 import re
@@ -47,15 +48,14 @@ class UML_MainGUI(UML_mainMeta):
         super(UML_MainGUI, self).__init__(*args, **kwargs)
         self.metapath, self.fullpath = 'scripts/client/mods/ownModelMeta.xml', "scripts/client/mods/ownModel.xml"
         self.sectionMeta = self.openXMLConfig(self.metapath)
-        self.sectionMain = ResMgr.openSection(self.fullpath)
+        self.sectionMain = self.openXMLConfig(self.fullpath)
         ctx = self.configCtx = (None, self.fullpath)
         self.sectionMainModel =  _xml.getChildren(ctx, self.sectionMain, 'models')
         
         self.metakey = {"remodelsFilelist" : "configLib"} # keys that will be written to sectionMeta
         self.mainkey = {"affectHangar":"affectHangar", 
                         "useUMLSound":"useUMLSound", 
-                        "MOErank": "MOE_rank",
-                        "forcedEmblem": "forcedEmblem"
+                        "MOErank": "MOE_rank"
                        } # keys that will be written to sectionMain
         
         # self.dumpCamouflageData()
@@ -66,7 +66,7 @@ class UML_MainGUI(UML_mainMeta):
         self._type_data = {"heavyTank": set(), "lightTank": set(), "mediumTank": set(), "AT-SPG": set(), "SPG": set()}
         self._list_styles = dict()
         # ignore the variants by keywords. Maybe?
-        ignore_keyword = {"MapsTraining", "_bootcamp", "_FL", "_training", "_IGR", "_bot", "_bob"}
+        ignore_keyword = {"MapsTraining", "_bootcamp", "_FL", "_training", "_IGR", "_bot", "_bob", "_CL", "_fallout", "_cl"}
         for vehicle_obj in list_every_vehicles:
             nation, tankprofilename = vehicle_obj.name.split(":")
             if(any(k in tankprofilename for k in ignore_keyword)):
@@ -98,17 +98,31 @@ class UML_MainGUI(UML_mainMeta):
         self.vehicleSelectorData = None
         
         # Construct camo & paint data
-        self._camo_list = [(k, v.userString) for k, v in vehicles.g_cache.customization20().camouflages.items()]
-        self._paint_list = [(k, v.userString) for k, v in vehicles.g_cache.customization20().paints.items()]
-        # sanitize - if userString is blank, replace with formatted unknown
-        self._camo_list = [(k, n if n != "" else "Unknown (ID {:d})".format(k)) for k, n in self._camo_list ]
-        self._paint_list = [(k, n if n != "" else "Unknown (ID {:d})".format(k)) for k, n in self._paint_list ]
+        camo_list = [(k, v.userString if v.userString != "" else "Unknown (ID {:d})".format(k), v.season) for k, v in vehicles.g_cache.customization20().camouflages.items()]
+        paint_list = [(k, v.userString if v.userString != "" else "Unknown (ID {:d})".format(k), v.season) for k, v in vehicles.g_cache.customization20().paints.items()]
+        # Merge the season to the description -  {}
+        season_name_list = self._snl = {SeasonType.SUMMER: "Summer", SeasonType.WINTER: "Winter", SeasonType.DESERT: "Desert", SeasonType.EVENT: "Event", SeasonType.ALL: "All"}
+        self._camo_list = [(k, "[{:s}] {:s}".format(season_name_list.get(s, "Unknown"), d)) for k, d, s in camo_list]
+        self._paint_list = [(k, d) for k, d, s in paint_list] # paint doesn't have seasons apparently
         
-        # Construct decal data for replaceOwnCustomization similarly; falling back to texturename when description available
-        self._decal_list = [(k, v.userString if v.userString != "" else getTextureFilename(v.texture)) for k, v in vehicles.g_cache.customization20().decals.items()]
-
+        self._decal_list = []
+        # Construct decal data for replaceOwnCustomization similarly; falling back to texturename when description are unavailable
+        try:
+            for k, v in vehicles.g_cache.customization20().decals.items():
+                if hasattr(v, "i18n") and isinstance(v.i18n, str):
+                    # customized decals put in by UML; the description retrieval is a bit different
+                    desc = v.i18n
+                else:
+                    # normal WoT decal, retrieve as normal (userString, if it's bad use texture filename)
+                    desc = v.userString 
+                    if v.userString == "": # in case the strings are blank
+                        desc = getTextureFilename(v.texture)
+                self._decal_list.append( (k, desc) )
+        except AttributeError as e:
+            print("[UML GUI] decal read error: {} {} {} {}".format(e, k, v, v.i18n))
+        
     def printObjToLog(self, obj):
-        print("printObjToLog, obj found: ", obj, type(obj))
+        print("[UML GUI] printObjToLog, obj found: ", obj, type(obj))
     
     def writeDataToSection(self, key, value, usedSection=None):
         # attempt to write the key with value into the corresponding sections.
@@ -119,7 +133,7 @@ class UML_MainGUI(UML_mainMeta):
         elif(key in self.mainkey.keys()): # key from sectionMain
             usedSection, truekey = self.sectionMain, self.mainkey[key]
         else:
-            print("Unidentified key for value {}:{}, skipping.".format(key, value))
+            print("[UML GUI] Unidentified key for value {}:{}, skipping.".format(key, value))
             return
         
         if(isinstance(value, (str, unicode))):
@@ -128,9 +142,30 @@ class UML_MainGUI(UML_mainMeta):
             usedSection.writeBool(truekey, value);
         elif(isinstance(value, int)):
             usedSection.writeInt(truekey, value);
+        elif(isinstance(value, (tuple, list))):
+            # write tuple using UML formatting (separated by comma)
+            usedSection.writeString(truekey, ", ".join(str(v) for v in value) )
         else:
-            print("Unknown type {} of value {}, can't write to chosen section.".format(type(value), value))
+            print("[UML GUI] Unknown type {} of value {}, can't write to chosen section.".format(type(value), value))
     
+    def updateForcedCustomization(self, customizationdata, mainSection):
+        # print("[UML GUI] debug: ", customizationdata)
+        if(customizationdata):
+            for namespace, datadict in zip(["player", "ally", "enemy"], customizationdata):
+                for field, value in datadict.items():
+                    if(isinstance(value, (tuple, list))):
+                        if all((v == -2 for v in value[1:])):
+                            # if all other values has -2, collapse to only one value
+                            value = value[0]
+                        else:
+                            # if not, copy all the -2 with the base
+                            value = tuple([v if v != -2 else value[0] for v in value])
+                    self.writeDataToSection("{:s}/{:s}".format(namespace, field), value, usedSection=mainSection)
+                    # print("[UML GUI] debug write to section {}/{} {} ({})".format(namespace, field, value, type(value)))
+                    # TODO maybe update the dict here instead of `UML_reload_func`?
+        else:
+            pass # do nothing when this customization data doesn't exist
+            
     @property
     def currentOMObject(self):
         if(hasattr(BigWorld, "om")):
@@ -140,30 +175,17 @@ class UML_MainGUI(UML_mainMeta):
             print("[UML GUI] OM data not available ATM; resorting to default values.")
             return None
     
+    def getIsDebugUMLFromPy(self):
+        return getattr(self.currentOMObject, "isDebug", False)
+    
+    def forcedCustomizationIsAvailableAtPy(self):
+        return hasattr(BigWorld, "forcedCustomizationDict")
+    
     @staticmethod
     def openXMLConfig(fullpath):
-        sectionMain = ResMgr.openSection(fullpath)
-        return sectionMain
+        section = ResMgr.openSection(fullpath)
+        return section
         
-    def retrieveProfileSettings(self, xmlConfigObj):
-        if xmlConfigObj:
-            configs = []
-            for name, section in xmlConfigObj:
-                profileCtx = (self.configCtx, 'models/' + name)
-                configs.append({"name": name, 
-                                "enabled": self.readValueFromSection(section, "enabled", bool, sectionCtx=profileCtx, default=False), 
-                                "swapNPC": self.readValueFromSection(section, "swapNPC", bool, sectionCtx=profileCtx, default=False),
-                                "useWhitelist": self.readValueFromSection(section, "useWhitelist", bool, sectionCtx=profileCtx, default=True),
-                                "whitelist": _multispace_regex.sub(" ", self.readValueFromSection(section, "whitelist", str, sectionCtx=profileCtx, default="")),
-                                "camouflageID": self.readValueFromSection(section, "camouflageID", int, sectionCtx=profileCtx, default=0),
-                                "paintID": self.readValueFromSection(section, "paintID", int, sectionCtx=profileCtx, default=0),
-                                "styleSet": self.readValueFromSection(section, "styleSet", str, sectionCtx=profileCtx, default="0"),
-                              })
-            return configs
-        else:
-            print("Error @retrieveProfileSettings: xmlConfigObj is not available.")
-            return []
-    
     @staticmethod
     def readValueFromSection(section, valuename, valuetype, sectionCtx=None, tuplesize=3, default=None):
         # read the value from section depending on type.
@@ -187,7 +209,56 @@ class UML_MainGUI(UML_mainMeta):
                 raise ValueError("Unknown type {} set.".format(valuetype))
         else:
             return default
+            
+    def retrieveProfileSettings(self, xmlConfigObj):
+        if xmlConfigObj:
+            configs = []
+            for name, section in xmlConfigObj:
+                profileCtx = (self.configCtx, 'models/' + name)
+                new_config = {"name": name, 
+                                "enabled": self.readValueFromSection(section, "enabled", bool, sectionCtx=profileCtx, default=False), 
+                                "swapNPC": self.readValueFromSection(section, "swapNPC", bool, sectionCtx=profileCtx, default=False),
+                                "useWhitelist": self.readValueFromSection(section, "useWhitelist", bool, sectionCtx=profileCtx, default=True),
+                                "whitelist": _multispace_regex.sub(" ", self.readValueFromSection(section, "whitelist", str, sectionCtx=profileCtx, default="")),
+                                "camouflageID": self.readValueFromSection(section, "camouflageID", int, sectionCtx=profileCtx, default=0),
+                                "paintID": self.readValueFromSection(section, "paintID", int, sectionCtx=profileCtx, default=0),
+                                "styleSet": self.readValueFromSection(section, "styleSet", str, sectionCtx=profileCtx, default="0"),
+                             }
+                # add, read parent; if exist, add it to the config structure
+                parent = self.readValueFromSection(section, "parent", str, sectionCtx=profileCtx, default="invalid_parent_str")
+                if(parent != "invalid_parent_str"):
+                    new_config["parent"] = parent
+                # if name or parent is WOT's known vehicle, allow a read of configString
+                if(name in self._code_to_tank.keys() or parent in self._code_to_tank.keys()):
+                    new_config["configString"] = self.readValueFromSection(section, "configString", str, sectionCtx=profileCtx, default="9999")
+                configs.append(new_config)
+            return configs
+        else:
+            print("[UML GUI] Error @retrieveProfileSettings: xmlConfigObj is not available.")
+            return []
     
+    def retrieveForcedConfigSettings(self):
+        if(self.forcedCustomizationIsAvailableAtPy()):
+            config = [{}, {}, {}]
+            customization_dict = BigWorld.forcedCustomizationDict
+            if("playerForcedEmblem" not in customization_dict):
+                # Ignore the usual lazyload - call the reload func immediately
+                BigWorld.forcedCustomizationDict["UML_reload_func"]()
+            # print("Customization dict: {}".format(customization_dict))
+            for idx, namespace in enumerate(["player", "ally", "enemy"]):
+                for field, size in [("forcedEmblem", 2), ("forcedBothEmblem", None), ("forcedCamo", 3), ("forcedPaint", 3)]:
+                    truefield = field[:1].upper() + field[1:]
+                    config[idx][field] = value = customization_dict.get("{:s}{:s}".format(namespace, truefield), 0)
+                    # print("Try loading {:s}{:s} from customization dict, result: {}".format(namespace, truefield, value))
+                    if(config[idx][field] is None): # None and 0 are functionally the same thing
+                        config[idx][field] = 0
+                    if(isinstance(config[idx][field], int) and size and size > 1):
+                        # duplicate to help the GUI not messing up; thankfully the forcedBothEmblem is bool
+                        config[idx][field] = tuple([config[idx][field]] + [-2] * (size - 1))
+            return config
+        else:
+            return None
+            
     def receiveStringConfigAtPy(self, strconf):
         if self._isDAAPIInited():
             try:
@@ -195,9 +266,11 @@ class UML_MainGUI(UML_mainMeta):
             except Exception as e:
                 print("[UML GUI] Error while parsing json: " + str(e))
                 return
-            #print("Received object:", jsondata)
-            #print("List available function: ", [func for func in dir(self.sectionMain) if callable(func)])
-            #return
+            # lastProfileSelectedIdx should be popped as it is game instance setting, not worth keeping in UML
+            self.currentOMObject.lastProfileSelectedIdx = jsondata.pop('lastProfileSelectedIdx', 0)
+            # forcedCustomization should be converted
+            self.updateForcedCustomization(jsondata.pop('forcedCustomization', None), self.sectionMain)
+            # model data should be popped as well
             model_data = jsondata.pop("listProfileObjects", [])
             sectiondict = {k: v for k, v in _xml.getChildren(self.configCtx, self.sectionMain, 'models')} # convert list to dictionary
             for modelconf in model_data:
@@ -205,7 +278,7 @@ class UML_MainGUI(UML_mainMeta):
                 pname = modelconf.pop("name")
                 xmlname = 'models/' + str(pname)
                 if(not self.sectionMain.has_key(xmlname) or pname not in sectiondict): # new config, create and update the sectiondict again
-                    print("XML name used for createSection: {} {}".format(xmlname, type(xmlname)))
+                    print("[UML GUI] XML name used for createSection: {} {}".format(xmlname, type(xmlname)))
                     self.sectionMain.createSection(xmlname)
                     sectiondict = {k: v for k, v in _xml.getChildren(self.configCtx, self.sectionMain, 'models')}
                 section = sectiondict[pname]
@@ -220,6 +293,9 @@ class UML_MainGUI(UML_mainMeta):
             # TODO maybe we don't have to reload if the libModel isn't updated?
             self.currentOMObject.loadConfig()
             g_currentVehicle.refreshModel()    
+            # additionally, if replaceOwnCustomization mod exist, attempt to reload its configuration as well.
+            if(hasattr(BigWorld, "forcedCustomizationDict")):
+                BigWorld.forcedCustomizationDict["UML_reload_func"]()
         else:
             jsondata = None
     
@@ -228,15 +304,17 @@ class UML_MainGUI(UML_mainMeta):
         config['affectHangar'] = getattr(om, 'affectHangar', False)
         config['useUMLSound'] = getattr(om, 'useUMLSound', False)
         config['MOErank'] = getattr(om, 'MOErank', -1)
-        config['forcedEmblem'] = getattr(om, 'forcedEmblem', 0)
-        # convert later
+        # config['forcedEmblem'] = getattr(om, 'forcedEmblem', 0)
+        config['lastProfileSelectedIdx'] = getattr(om, 'lastProfileSelectedIdx', 0)
+        
         config['listProfileObjects'] = self.retrieveProfileSettings(self.sectionMainModel)
+        config['forcedCustomization'] = self.retrieveForcedConfigSettings()
         config['remodelsFilelist'] = self.readValueFromSection(self.sectionMeta, "configLib", str, sectionCtx=None, default="placeholder_list_of_libs")
         return json.dumps(config)
     
     def getVehicleSelectorDataFromPy(self):
         if(self.vehicleSelectorData is None):
-            roman_conv = {"I": 1, "II": 2, "III": 3, "IV": 4, "V": 5, "VI": 6, "VII": 7, "VIII": 8, "IX": 9, "X": 10}
+            # roman_conv = {"I": 1, "II": 2, "III": 3, "IV": 4, "V": 5, "VI": 6, "VII": 7, "VIII": 8, "IX": 9, "X": 10}
             self.vehicleSelectorData = {
                 "nations": ["Any"] + sorted(list(self._nation_data.keys())),
                 "types": ["Any"] + sorted(list(self._type_data.keys())),

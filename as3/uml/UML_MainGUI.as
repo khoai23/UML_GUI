@@ -2,6 +2,7 @@ package uml
 {
    import net.wg.infrastructure.base.AbstractWindowView;
    import flash.utils.Dictionary;
+   import flash.utils.getQualifiedClassName;
    import flash.events.Event;
    import flash.text.TextFieldAutoSize;
    import scaleform.clik.events.ListEvent;
@@ -48,7 +49,7 @@ package uml
 	  public var forward_btn : SoundButtonEx;
 	  public var backward_btn : SoundButtonEx;
 	  public var profile_selector : DropdownMenu;
-	  public var current_profile_name : LabelControl;
+	  public var current_profile_name : TextInput;
 	  public var current_profile_enable : CheckBox;
 	  public var current_profile_swapNPC : CheckBox;
 	  public var current_profile_usewhitelist : CheckBox;
@@ -60,10 +61,12 @@ package uml
 	  public var current_profile_paint_help : LabelControl;
 	  public var current_profile_style : DropdownMenu;
 	  public var current_profile_style_help : LabelControl;
+	  public var current_profile_configString : TextInput;
+	  public var current_profile_configString_help : LabelControl;
 	  public var delete_profile : SoundButtonEx;
 	  public var use_hangar_vehicle : SoundButtonEx;
 	  
-	  
+	  // vehicle selector
 	  public var help_vehicle_selector : LabelControl;
 	  public var vehicle_nations : DropdownMenu;
 	  public var vehicle_type : DropdownMenu;
@@ -74,18 +77,35 @@ package uml
 	  public var add_profile_btn : SoundButtonEx;
 	  public var add_whitelist_btn : SoundButtonEx;
 	 
+	  // debug component
 	  public var debug_exec_field : TextInput;
 	  public var debug_eval_field : TextInput;
 	  public var debug_btn : SoundButtonEx;
+	 
+	  // forcedCustomization component
+	  public var help_forced_customization : LabelControl;
+	  public var target_customization : DropdownMenu;
+	  public var first_emblem : DropdownMenu;
+	  public var second_emblem : DropdownMenu;
+	  public var force_both_emblem : CheckBox;
+	  public var summer_camo : DropdownMenu;
+	  public var winter_camo : DropdownMenu;
+	  public var desert_camo : DropdownMenu;
+	  public var summer_paint : DropdownMenu;
+	  public var winter_paint : DropdownMenu;
+	  public var desert_paint : DropdownMenu;
+	  
 	 
 	  // test
 	  //public var profileIcon : UILoaderAlt
 	  //protected var current_profile_index : Number = 0;
 	  protected var list_profile_objects : Array;
 	  protected var list_styles : Array = null;
-	  protected var camo_paint_data : Object;
+	  protected var customization_data : Object;
+	  protected var forced_customization : Array = null;
 	  
 	  public var getIsDebugUMLFromPy : Function = null; // this will get UML's debug to decide showing debug fields (eval, exec) or not
+	  public var forcedCustomizationIsAvailableAtPy : Function = null; // this will check if forcedCustomization module exist or not
       public var receiveStringConfigAtPy : Function = null; // this will receive config data from swf to python
 	  public var getStringConfigFromPy : Function = null;	// this will get config data from python to swf
 	  public var getVehicleSelectorDataFromPy : Function = null; // this will get permanent vehicle categories (nation, class, tier)
@@ -142,10 +162,11 @@ package uml
 			
 			// format: profile name (label) - enable - whitelist
 		   //this.profile_selector.dataProvider.invalidate();
-		   this.current_profile_name = createLabel("profile_placeholder", 35, 105);
+		   this.current_profile_name = createTextInput("profile_placeholder", 35, 102);
+		   this.current_profile_name.enabled = false;
 		   this.current_profile_name.width = 200;
-		   this.current_profile_name.autoSize = TextFieldAutoSize.LEFT;
-		   this.current_profile_name.toolTip = "The full name of the profile.";
+		   // this.current_profile_name.autoSize = TextFieldAutoSize.LEFT;
+		   // this.current_profile_name.toolTip = "The full name of the profile.";
 		   this.current_profile_target_help = createLabel("Enabled profiles:", 35 + 125, 105 + 20);
 		   this.current_profile_target = createTextInput("whitelist_placeholder", 35 + 225, 102 + 20);
 		   this.current_profile_enable = createCheckbox("Enabled", 35, 105 + 20);
@@ -153,9 +174,15 @@ package uml
 		   
 		   this.current_profile_camo_help = createLabel("Camouflage ID:", 35 + 125, 105 + 40);
 		   this.current_profile_camo = createDropdown(35 + 225, 102 + 40);
+		   this.current_profile_camo.width = 180;
 		   this.current_profile_paint_help = createLabel("Paint ID:", 35 + 125, 105 + 60);
 		   this.current_profile_paint = createDropdown(35 + 225, 102 + 60);
+		   this.current_profile_paint.width = 180;
 		   
+		   this.current_profile_configString_help = createLabel("Config:", 35, 105 + 80)
+		   this.current_profile_configString = createTextInput("N/A", 35 + 50, 102 + 80);
+		   this.current_profile_configString.width = 60;
+		   this.current_profile_configString.enabled = false;
 		   this.current_profile_style_help = createLabel("Style:", 35 + 125, 105 + 80);
 		   this.current_profile_style = createDropdown(35 + 225, 102 + 80);
 		   this.use_hangar_vehicle = createButton("Add hangar vehicle to Whitelist", 35 + 20, 105 + 105, true);
@@ -174,11 +201,17 @@ package uml
 		    this.current_profile_camo.addEventListener(ListEvent.INDEX_CHANGE, this.onCamoChange);
 		    this.current_profile_paint.addEventListener(ListEvent.INDEX_CHANGE, this.onPaintChange);
 			this.current_profile_style.addEventListener(ListEvent.INDEX_CHANGE, this.onStyleChange);
+			this.current_profile_configString.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onConfigStringChange);
 			this.delete_profile.addEventListener(ButtonEvent.CLICK, this.removeProfile);
 			this.use_hangar_vehicle.addEventListener(ButtonEvent.CLICK, this.addHangarVehicleToWhitelist);
 			
 			// adding the concerning VehicleSelector panel
-			this.createVehicleSelector(35 + 385, 65);
+			this.createVehicleSelector(35 + 425, 65);
+			
+			// adding forcedCustomization section if the mod is available
+			if(this.forcedCustomizationIsAvailableAtPy()) {
+				this.createForcedCustomizationSelector(35, 250);
+			}
 		}
 		else {
 			// not working ATM; this version is interactable but do not display
@@ -192,23 +225,25 @@ package uml
 		 
 		if(this.getIsDebugUMLFromPy()) { 
 			// debug
-			this.debug_exec_field = createTextInput("debug_exec_field", 35 + 385 + 60, y + 200);
-			this.debug_eval_field = createTextInput("debug_eval_field", 35 + 385 + 60, y + 220);
-			this.debug_btn = createButton("Debug", 35 + 385 + 60, y + 245);
+			this.debug_exec_field = createTextInput("debug_exec_field", 32, 365);
+			this.debug_eval_field = createTextInput("debug_eval_field", 162, 365);
+			this.debug_btn = createButton("Debug", 295, 365, true);
 			this.debug_btn.addEventListener(ButtonEvent.CLICK, this.sendDebugCmdFromAS);
 		}
 	  }
 	  
 	  internal function populatePaintCamo() : void {
-		this.camo_paint_data = this.loadCustomizationDataFromPy();
+		this.customization_data = this.loadCustomizationDataFromPy();
 		// update with Remove & No change (-1, 0)
-		this.camo_paint_data["camoName"].unshift("Remove", "No change");
-		this.camo_paint_data["paintName"].unshift("Remove", "No change");
-		this.camo_paint_data["camoID"].unshift(-1, 0);
-		this.camo_paint_data["paintID"].unshift(-1, 0);
+		this.customization_data["camoName"].unshift("Remove", "No change");
+		this.customization_data["paintName"].unshift("Remove", "No change");
+		this.customization_data["decalName"].unshift("Remove", "No change");
+		this.customization_data["camoID"].unshift(-1, 0);
+		this.customization_data["paintID"].unshift(-1, 0);
+		this.customization_data["decalID"].unshift(-1, 0);
 		
-		this.current_profile_camo.dataProvider = new DataProvider(this.camo_paint_data["camoName"]);
-		this.current_profile_paint.dataProvider = new DataProvider(this.camo_paint_data["paintName"]);
+		this.current_profile_camo.dataProvider = new DataProvider(this.customization_data["camoName"]);
+		this.current_profile_paint.dataProvider = new DataProvider(this.customization_data["paintName"]);
 		this.current_profile_camo.invalidateData();
 		this.current_profile_paint.invalidateData();
 		this.current_profile_camo.selectedIndex = 1; // default to no changes
@@ -245,6 +280,55 @@ package uml
 		this.add_whitelist_btn.addEventListener(ButtonEvent.CLICK, this.addProfileToWhitelist);
 	  }
 	  
+	  internal function createForcedCustomizationSelector(x: Number, y: Number): void {
+		// Dropdown list selecting: Target (player, ally, enemy); 
+		//							first_emblem, second_emblem; camo set of 3; paint set of 3
+		this.help_forced_customization = createLabel("Force Customization", x, y);
+		this.target_customization = createDropdown(x + 150, y - 2);
+		this.first_emblem = createDropdown(x, y + 23);
+		this.second_emblem = createDropdown(x + 130, y + 23);
+		this.force_both_emblem = createCheckbox("Force both emblems", x + 260, y + 25);
+		this.summer_camo = createDropdown(x, y + 48);
+		this.winter_camo = createDropdown(x + 130, y + 48);
+		this.desert_camo = createDropdown(x + 260, y + 48);
+		this.summer_paint = createDropdown(x, y + 73);
+		this.winter_paint = createDropdown(x + 130 , y + 73);
+		this.desert_paint = createDropdown(x + 260, y + 73);
+		
+		// update values to help forced customization
+		this.customization_data["sec_camoName"] = this.customization_data["camoName"].concat(); this.customization_data["sec_camoName"].unshift("Same as Summer");
+		this.customization_data["sec_paintName"] = this.customization_data["paintName"].concat(); this.customization_data["sec_paintName"].unshift("Same as Summer");
+		this.customization_data["sec_decalName"] = this.customization_data["decalName"].concat(); this.customization_data["sec_decalName"].unshift("Same as First");
+		this.customization_data["sec_camoID"] = this.customization_data["camoID"].concat(); this.customization_data["sec_camoID"].unshift(-2);
+		this.customization_data["sec_paintID"] = this.customization_data["paintID"].concat(); this.customization_data["sec_paintID"].unshift(-2);
+		this.customization_data["sec_decalID"] = this.customization_data["decalID"].concat(); this.customization_data["sec_decalID"].unshift(-2);
+		
+		this.target_customization.dataProvider = new DataProvider(["Player", "Ally", "Enemy"]);
+		this.first_emblem.dataProvider = new DataProvider(this.customization_data["decalName"]);
+		this.second_emblem.dataProvider = new DataProvider(this.customization_data["sec_decalName"]);
+		this.summer_camo.dataProvider = new DataProvider(this.customization_data["camoName"]);
+		this.winter_camo.dataProvider = new DataProvider(this.customization_data["sec_camoName"]);
+		this.desert_camo.dataProvider = new DataProvider(this.customization_data["sec_camoName"]);
+		this.summer_paint.dataProvider = new DataProvider(this.customization_data["paintName"]);
+		this.winter_paint.dataProvider = new DataProvider(this.customization_data["sec_paintName"]);
+		this.desert_paint.dataProvider = new DataProvider(this.customization_data["sec_paintName"]);
+		
+		this.target_customization.selectedIndex = 0;
+		var customization_data : Object = this.customization_data;
+		var _updateCustomizationData : Function = updateCustomizationData;
+		// event binding
+		this.target_customization.addEventListener(ListEvent.INDEX_CHANGE, this.reloadForcedCustomization);
+		this.first_emblem.addEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
+		this.second_emblem.addEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
+		this.force_both_emblem.addEventListener(ButtonEvent.CLICK, this.updateCustomizationData);
+		this.summer_camo.addEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
+		this.winter_camo.addEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
+		this.desert_camo.addEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
+		this.summer_paint.addEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
+		this.winter_paint.addEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
+		this.desert_paint.addEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
+	  }
+	  
 	  override protected function onDispose() : void
 	  {
         this.apply_button.removeEventListener(ButtonEvent.CLICK, this.sendStringConfigFromAS);
@@ -264,10 +348,23 @@ package uml
 			this.vehicle_selector.removeEventListener(ListEvent.INDEX_CHANGE, this.loadVehicleProfileToAS);
 			this.add_profile_btn.removeEventListener(ButtonEvent.CLICK, this.addNewProfile);
 			this.add_whitelist_btn.removeEventListener(ButtonEvent.CLICK, this.addProfileToWhitelist);
-		}
 		
-		if(this.getIsDebugUMLFromPy()) {
-			this.debug_btn.removeEventListener(ButtonEvent.CLICK, this.sendDebugCmdFromAS);
+			if(this.getIsDebugUMLFromPy()) {
+				this.debug_btn.removeEventListener(ButtonEvent.CLICK, this.sendDebugCmdFromAS);
+			}
+			
+			if(this.forcedCustomizationIsAvailableAtPy()) { // currently left unused
+				this.target_customization.removeEventListener(ListEvent.INDEX_CHANGE, this.reloadForcedCustomization);
+				this.first_emblem.removeEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
+				this.second_emblem.removeEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
+				this.force_both_emblem.removeEventListener(ButtonEvent.CLICK, this.updateCustomizationData);
+				this.summer_camo.removeEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
+				this.winter_camo.removeEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
+				this.desert_camo.removeEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
+				this.summer_paint.removeEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
+				this.winter_paint.removeEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
+				this.desert_paint.removeEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
+			}
 		}
 		//this.profile_list.dataProvider.cleanUp();
 		//this.profile_list = null;
@@ -294,7 +391,7 @@ package uml
 		this.forward_btn.enabled = current_idx < (this.list_profile_objects.length-1);
 		// load respective data into components
 		var currentProfile : Object = this.list_profile_objects[current_idx];
-		//DebugUtils.LOG_WARNING("loadProfileAtCurrentIndex called for obj:" + String(currentProfile));
+		//DebugUtils.LOG_WARNING("loadProfileAtCurrentIndex called for obj:" + String(currentProfile) + " at index " + String(current_idx));
 		this.current_profile_name.text = currentProfile["name"];
 		this.current_profile_enable.selected = currentProfile["enabled"];
 		this.current_profile_swapNPC.selected = currentProfile["swapNPC"];
@@ -303,9 +400,16 @@ package uml
 		} else {
 			this.current_profile_target.text = ""
 		}
-		this.current_profile_camo.selectedIndex = this.camo_paint_data["camoID"].indexOf(currentProfile["camouflageID"]);
-		this.current_profile_paint.selectedIndex = this.camo_paint_data["paintID"].indexOf(currentProfile["paintID"]);
+		this.current_profile_camo.selectedIndex = this.customization_data["camoID"].indexOf(currentProfile["camouflageID"]);
+		this.current_profile_paint.selectedIndex = this.customization_data["paintID"].indexOf(currentProfile["paintID"]);
 		this.updateStyleOptionInAS(currentProfile["styleSet"], currentProfile["name"]);
+		if("configString" in currentProfile) {
+			this.current_profile_configString.enabled = true;
+			this.current_profile_configString.text = currentProfile["configString"];
+		} else {
+			this.current_profile_configString.enabled = false;
+			this.current_profile_configString.text = "N/A";
+		}
 	  }
 	  
 	  internal function onSetEnableProfile() : void {
@@ -326,13 +430,23 @@ package uml
 		}
 	  }
 	  
+	  internal function onConfigStringChange() : void {
+		// only applies for those with existing configString param
+		if("configString" in this.list_profile_objects[this.profile_selector.selectedIndex]) {
+			this.list_profile_objects[this.profile_selector.selectedIndex]["configString"] = this.current_profile_configString.text;
+		} else {
+			DebugUtils.LOG_WARNING("[UML GUI][AS] Attempt to write configString [" + this.current_profile_configString.text + 
+					"] on invalid profile name [" + this.current_profile_name.text + "] called. Check if needed.");
+		}
+	  }
+	  
 	  internal function onCamoChange() : void {
 		// retrieve matching ID from camoID
-		this.list_profile_objects[this.profile_selector.selectedIndex]["camouflageID"] = this.camo_paint_data["camoID"][this.current_profile_camo.selectedIndex];
+		this.list_profile_objects[this.profile_selector.selectedIndex]["camouflageID"] = this.customization_data["camoID"][this.current_profile_camo.selectedIndex];
 	  }
 	  
 	  internal function onPaintChange() : void {
-		this.list_profile_objects[this.profile_selector.selectedIndex]["paintID"] = this.camo_paint_data["paintID"][this.current_profile_paint.selectedIndex];
+		this.list_profile_objects[this.profile_selector.selectedIndex]["paintID"] = this.customization_data["paintID"][this.current_profile_paint.selectedIndex];
 	  }
 	  
 	  internal function onStyleChange() : void {
@@ -369,7 +483,7 @@ package uml
 			this.profile_selector.selectedIndex = profile_index_if_exist;
 			return
 		} else { // create new object at the end and jump into it.
-			var newProfile : Object = {"name": this.vehicle_profile_field.text, "enabled": false, "useWhitelist": true, "whitelist": "", "camouflageID": 0, "paintID": 0};
+			var newProfile : Object = {"name": this.vehicle_profile_field.text, "enabled": false, "useWhitelist": true, "whitelist": "", "camouflageID": 0, "paintID": 0, "configString": 9999};
 			this.list_profile_objects.push(newProfile);
 			this.reloadProfileSelector();
 			this.profile_selector.selectedIndex = this.list_profile_objects.length - 1;
@@ -436,11 +550,15 @@ package uml
 	  }
 	  
 	  public function sendStringConfigFromAS() : void { // paired with receiveStringConfig
+		  // DebugUtils.LOG_WARNING("Last profile selected to put to OM object: " + String(this.vehicle_selector.selectedIndex))
 		  var dict : Object = { "affectHangar": this.affect_hangar.selected,
 								"useUMLSound": this.use_UML_sound.selected,
 								"remodelsFilelist": this.remodels_filelist.text,
 								"MOErank": (this.moe_selector.selectedIndex - 1),
-								"listProfileObjects": this.list_profile_objects };
+								"lastProfileSelectedIdx": this.profile_selector.selectedIndex,
+								"listProfileObjects": this.list_profile_objects,
+								"forcedCustomization": this.forced_customization
+								};
           this.receiveStringConfigAtPy(App.utils.JSON.encode(dict))
 	  }
 	  
@@ -457,16 +575,76 @@ package uml
 		  this.affect_hangar.selected = dict["affectHangar"];
 		  this.use_UML_sound.selected = dict["useUMLSound"];
 		  this.remodels_filelist.text = dict["remodelsFilelist"]
-		  // update profile list & index
+		  // update profile list & index to the last selected profile 
 		  if(this.isStatic) {
 			  this.list_profile_objects = dict["listProfileObjects"]
 			  this.reloadProfileSelector();
-			  this.profile_selector.selectedIndex = 0;
+			  this.profile_selector.selectedIndex = dict['lastProfileSelectedIdx'];
 			  this.loadProfileAtCurrentIndex();
 		  }
 		  // update current MOE rank; auto is -1 and goes from 0-3, therefore we can simply +1 before and after
 		  this.moe_selector.selectedIndex = dict["MOErank"] + 1;
+		  // update forcedCustomization if available
+		  this.forced_customization = dict["forcedCustomization"];
+		  if(this.forced_customization != null) {
+			  // pitfall: if the this.forced_customization dict is set and reload is called, the first selectedIndex change will attempt to reload and end up overwriting subsequent values with unset values (null).
+			  // redone the reload fn; the above is no longer true.
+			  this.reloadForcedCustomization();
+			}
       }
+	  
+	  public function reloadForcedCustomization() : void {
+		//reload_dict = reload_dict == null ? this.forced_customization : reload_dict;
+		var target_dict : Object = this.forced_customization[this.target_customization.selectedIndex];
+		DebugUtils.LOG_WARNING("debug @reloadForcedCustomization: " + App.utils.JSON.encode(target_dict));
+		this.first_emblem.selectedIndex = this.customization_data["decalID"].indexOf(target_dict["forcedEmblem"][0]);
+		this.second_emblem.selectedIndex = this.customization_data["sec_decalID"].indexOf(target_dict["forcedEmblem"][1]);
+		this.force_both_emblem.selected = target_dict["forcedBothEmblem"];
+		this.summer_camo.selectedIndex = this.customization_data["camoID"].indexOf(target_dict["forcedCamo"][0]);
+		this.winter_camo.selectedIndex = this.customization_data["sec_camoID"].indexOf(target_dict["forcedCamo"][1]);
+		this.desert_camo.selectedIndex = this.customization_data["sec_camoID"].indexOf(target_dict["forcedCamo"][2]);
+		this.summer_paint.selectedIndex = this.customization_data["paintID"].indexOf(target_dict["forcedPaint"][0]);
+		this.winter_paint.selectedIndex = this.customization_data["sec_paintID"].indexOf(target_dict["forcedPaint"][1]);
+		this.desert_paint.selectedIndex = this.customization_data["sec_paintID"].indexOf(target_dict["forcedPaint"][2]);
+	  }
+	  
+	  public function updateCustomizationData(e : Event) : void {
+		var target_dict : Object = this.forced_customization[this.target_customization.selectedIndex];
+		// DebugUtils.LOG_WARNING("After target_dict");
+		/*for(var key : String in this.customization_data) {
+			DebugUtils.LOG_WARNING("debug @updateCustomizationData - key [" + key + "]; length " + String(this.customization_data[key].length));
+		}*/
+		if(this.force_both_emblem == e.target) {
+			target_dict["forcedBothEmblem"] = this.force_both_emblem.selected;
+		} else {
+			switch(e.target) {
+				case this.first_emblem:
+					target_dict["forcedEmblem"][0] = this.customization_data["decalID"][this.first_emblem.selectedIndex];
+					break;
+				case this.second_emblem:
+					target_dict["forcedEmblem"][1] = this.customization_data["sec_decalID"][this.second_emblem.selectedIndex];
+					break;
+				case this.summer_camo:
+					target_dict["forcedCamo"][0] = this.customization_data["camoID"][this.summer_camo.selectedIndex];
+					break;
+				case this.winter_camo:
+					target_dict["forcedCamo"][1] = this.customization_data["sec_camoID"][this.winter_camo.selectedIndex];
+					break;
+				case this.desert_camo:
+					target_dict["forcedCamo"][2] = this.customization_data["sec_camoID"][this.desert_camo.selectedIndex];
+					break;
+				case this.summer_paint:
+					target_dict["forcedPaint"][0] = this.customization_data["paintID"][this.summer_paint.selectedIndex];
+					break;
+				case this.winter_paint:
+					target_dict["forcedPaint"][1] = this.customization_data["sec_paintID"][this.winter_paint.selectedIndex];
+					break;
+				case this.desert_paint:
+					target_dict["forcedPaint"][2] = this.customization_data["sec_paintID"][this.desert_paint.selectedIndex];
+					break;
+			}
+		}
+	  }
 	  
 	  public function sendDebugCmdFromAS() : void {
 		this.debugEvalCommand(this.debug_exec_field.text, this.debug_eval_field.text)

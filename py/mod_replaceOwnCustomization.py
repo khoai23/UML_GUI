@@ -1,13 +1,15 @@
 import types
 from vehicle_systems.CompoundAppearance import CompoundAppearance
 from vehicle_systems import camouflages
-from items.customizations import CustomizationOutfit, CamouflageComponent, PaintComponent, DecalComponent
-from items.components.c11n_constants import ApplyArea, SeasonType
+from items.customizations import CustomizationOutfit, createNationalEmblemComponents, CamouflageComponent, PaintComponent, DecalComponent, PersonalNumberComponent
+from items.components.c11n_constants import ApplyArea, SeasonType, CUSTOMIZATION_SLOTS_VEHICLE_PARTS, SLOT_TYPE_NAMES
+from items.components.c11n_components import getAvailableDecalRegions
 from vehicle_outfit.outfit import Outfit
 from items import vehicles
 from gui.hangar_vehicle_appearance import HangarVehicleAppearance
 import BigWorld
 import ResMgr
+from debug_utils import LOG_WARNING, LOG_ERROR
 
 import os, io
 import random
@@ -37,7 +39,42 @@ def tryLoadIntValue(section, valueName, stringValue=None, tupleSizeCheck=None):
         return 0
     return None
 
+def tryLoadStrList(section, valueName):
+    """Load value; return None if not exist/blank; split by , if found."""
+    value = section.readString(valueName, "").strip()
+    if("," in value):
+        # list of value, split, strip and sanitize
+        listval = [v.strip() for v in value.split(",")]
+        validval = [v for v in listval if v]
+        if len(validval) == 0: # in the event of no valid fields
+            return None
+        return validval
+    else:
+        if value.strip(): # only return valid values as a single item list
+            return [value.strip()]
+        return None
         
+RANDOMIZE = -999
+HASH = -239
+def tryLoadPersonalNumber(section, valueName):
+    """Load value; return None if not exist/blank.
+    Can be a single number; `random` to randomize; `hash` to pseudo-randomize using hash. TODO add customized by format e.g 3-random-random will generate 300 to 399
+    """
+    value = section.readString(valueName, "").strip()
+    if(not value):
+        return None
+    elif(value.lower() == "random"):
+        return RANDOMIZE
+    elif(value.lower() == "hash"):
+        return HASH
+    else:
+        try:
+            value = int(value)
+            return value if value > 0 else -value # should I raise more error?
+        except ValueError:
+            LOG_ERROR("Read value {:s} from valueName {:s} @tryLoadPersonalNumber not convertable to int.".format(value, valueName))
+            return None
+
 def checkCustomizationID(id, customization_sets):
     # sets should be from vehicle_cache objs
     if(isinstance(id, int)):
@@ -50,8 +87,11 @@ def checkCustomizationID(id, customization_sets):
         raise ValueError("Invalid input type: {} {}".format(id, type(id)))
         
 def applyInHangar():
-    # ignore by default or binded to UML's affectHangar
+    # ignore by default or bound to UML's affectHangar
     return getattr(getattr(BigWorld, "om", None), "affectHangar", False)
+        
+        
+preset_personal_number =  vehicles.g_cache.customization20().personal_numbers[1]
         
 def loadSettingFromOMConfig(ownModelPath="scripts/client/mods/ownModel.xml"):
     """Update fields in OM file to forcedCustomizationDict"""
@@ -72,6 +112,13 @@ def loadSettingFromOMConfig(ownModelPath="scripts/client/mods/ownModel.xml"):
     playerForcedPaint = tryLoadIntValue(sectionMain, "player/forcedPaint", tupleSizeCheck=3)
     allyForcedPaint = tryLoadIntValue(sectionMain, "ally/forcedPaint", tupleSizeCheck=3)
     enemyForcedPaint = tryLoadIntValue(sectionMain, "enemy/forcedPaint", tupleSizeCheck=3)
+    # fields: OM.player.whitelist or .blacklist (str), list of vehicle wildcards separated by `,`
+    playerBlacklist, playerWhitelist = tryLoadStrList(sectionMain, "player/blacklist"), tryLoadStrList(sectionMain, "player/whitelist")
+    allyBlacklist, allyWhitelist = tryLoadStrList(sectionMain, "ally/blacklist"), tryLoadStrList(sectionMain, "ally/whitelist")
+    enemyBlacklist, enemyWhitelist = tryLoadStrList(sectionMain, "enemy/blacklist"), tryLoadStrList(sectionMain, "enemy/whitelist")
+    # field: OM.player.personalNumberID and OM.player.personalNumber
+    playerPersonalNumberID = tryLoadIntValue(sectionMain, "player/personalNumberID")
+    playerPersonalNumber = tryLoadPersonalNumber(sectionMain, "player/personalNumber")
     
     # check every values with corresponding cache
     emblemSet = playerForcedEmblem, allyForcedEmblem, enemyForcedEmblem = [checkCustomizationID(v, vehicles.g_cache.customization20().decals.keys()) for v in (playerForcedEmblem, allyForcedEmblem, enemyForcedEmblem) ]
@@ -84,12 +131,17 @@ def loadSettingFromOMConfig(ownModelPath="scripts/client/mods/ownModel.xml"):
                                             playerForcedCamo=playerForcedCamo, allyForcedCamo=allyForcedCamo, enemyForcedCamo=enemyForcedCamo,
                                             playerForcedPaint=playerForcedPaint, allyForcedPaint=allyForcedPaint, enemyForcedPaint=enemyForcedPaint
                                            )
+    BigWorld.forcedCustomizationDict.update(playerBlacklist=playerBlacklist, playerWhitelist=playerWhitelist, 
+                                            allyBlacklist=allyBlacklist, allyWhitelist=allyWhitelist, 
+                                            enemyBlacklist=enemyBlacklist, enemyWhitelist=enemyWhitelist,
+                                            playerPersonalNumberID=playerPersonalNumberID, playerPersonalNumber=playerPersonalNumber
+                                           )
 
 # keep a reference to work with UML GUI
 BigWorld.forcedCustomizationDict["UML_reload_func"] = loadSettingFromOMConfig
 
 def loadSettingFromText(textPath="forcedEmblem.txt"):
-    with io.open(personalDecalPath, "r") as df:
+    with io.open(textPath, "r") as df:
         try:
             """lines = [l.strip() for l in df.readlines()]
             playerForcedEmblem, allyForcedEmblem, enemyForcedEmblem = [tryLoadIntValue(None, None, stringValue=l, tupleSizeCheck=2) for l in lines[:3]]
@@ -99,10 +151,13 @@ def loadSettingFromText(textPath="forcedEmblem.txt"):
             data = json.load(df)
         except JSONDecodeError as e:
             print("Failed parsing json data: Error: {}".format(e))
-        playerForcedEmblem, allyForcedEmblem, enemyForcedEmblem = data.get("forcedEmblem", (None, None, None))
-        playerForcedBothEmblem, allyForcedBothEmblem, enemyForcedBothEmblem = data.get("forcedBothEmblem", (False, False, False))
-        playerForcedCamo, allyForcedCamo, enemyForcedCamo = data.get("forcedCamo", (None, None, None))
-        playerForcedPaint, allyForcedPaint, enemyForcedPaint = data.get("forcedPaint", (None, None, None))
+            return
+    # values needed to be popped instead of straight updating, as they need to be rechecked with g_cache
+    playerForcedEmblem, allyForcedEmblem, enemyForcedEmblem = data.pop("forcedEmblem", (None, None, None))
+    playerForcedCamo, allyForcedCamo, enemyForcedCamo = data.pop("forcedCamo", (None, None, None))
+    playerForcedPaint, allyForcedPaint, enemyForcedPaint = data.pop("forcedPaint", (None, None, None))
+    
+    playerForcedBothEmblem, allyForcedBothEmblem, enemyForcedBothEmblem = data.pop("forcedBothEmblem", (False, False, False))
     
     # check every values with corresponding cache
     emblemSet = playerForcedEmblem, allyForcedEmblem, enemyForcedEmblem = [checkCustomizationID(v, vehicles.g_cache.customization20().decals.keys()) for v in (playerForcedEmblem, allyForcedEmblem, enemyForcedEmblem) ]
@@ -114,7 +169,7 @@ def loadSettingFromText(textPath="forcedEmblem.txt"):
                                             playerForcedBothEmblem=playerForcedBothEmblem, allyForcedBothEmblem=allyForcedBothEmblem, enemyForcedBothEmblem=enemyForcedBothEmblem,
                                             playerForcedCamo=playerForcedCamo, allyForcedCamo=allyForcedCamo, enemyForcedCamo=enemyForcedCamo,
                                             playerForcedPaint=playerForcedPaint, allyForcedPaint=allyForcedPaint, enemyForcedPaint=enemyForcedPaint
-                                           )
+                                            **data) # the rest of json data is read directly
 
 TYPE_SELF, TYPE_ALLY, TYPE_ENEMY = "self", "ally", "enemy"
 DECAL_TYPE_LOOKUP = {TYPE_SELF: "playerForcedEmblem", TYPE_ALLY: "allyForcedEmblem", TYPE_ENEMY: "enemyForcedEmblem"}
@@ -158,8 +213,34 @@ def getCamoOrPaint(vehicleType, type_dict=CAMO_TYPE_LOOKUP, returnRandomSeason=T
         # invalid season e.g Event; return a random season if flag is enabled; or 0 if disabled
         return camo_idx[random.randint(len(camo_idx))] if returnRandomSeason else 0
 
-def modifyOutfitComponent(outfitComponent, vehicleId=None):
+BLACKLIST_LOOKUP = {TYPE_SELF: "playerBlacklist", TYPE_ALLY: "allyBlacklist", TYPE_ENEMY: "enemyBlacklist"}
+WHITELIST_LOOKUP = {TYPE_SELF: "playerWhitelist", TYPE_ALLY: "allyWhitelist", TYPE_ENEMY: "enemyWhitelist"}
+def checkList(vehicleType, vehicleDescriptor):
+    vehicleName = vehicleDescriptor.type.name
+    if(BigWorld.forcedCustomizationDict.get(WHITELIST_LOOKUP[vehicleType], None)): # WHITELIST TAKE PRECEDENCE
+        # check if vehicle is in whitelist
+        whitelist = BigWorld.forcedCustomizationDict[WHITELIST_LOOKUP[vehicleType]]
+        # print("Found whitelist: {}; searching for {}".format(whitelist, vehicleName))
+        return any(wtn in vehicleName for wtn in whitelist)
+    elif(BigWorld.forcedCustomizationDict.get(BLACKLIST_LOOKUP[vehicleType], None)):
+        # check if vehicle not in blacklist
+        blacklist = BigWorld.forcedCustomizationDict[BLACKLIST_LOOKUP[vehicleType]]
+        # print("Found blacklist: {}; searching for {}".format(blacklist, vehicleName))
+        return not any(wtn in vehicleName for wtn in blacklist)
+    else:
+        # default to every vehicle.
+        return True
+
+def decomposeApplyAreaRegion(combinedRegionValue, regionList=ApplyArea.RANGE):
+    # Because WoT already forced emblems and inscriptions to separate regions; it use appliedTo on this combined value (e.g TURRET & TURRET_1 is 512 + 256)
+    # we can simply AND (&) every individual positions. Can feed a regionList if we KNOW what component it is.
+    # print("Debug @decomposeApplyAreaRegion: ", combinedRegionValue, regionList)
+    return [r for r in regionList if r & combinedRegionValue]
+
+def modifyOutfitComponent(outfitComponent, outfitCD=None, vehicleDescriptor=None, vehicleId=None):
     # INJECTION HERE
+    if(not outfitCD and not BigWorld.forcedCustomizationDict.get("overrideEmptyOutfit", False)):
+        return outfitComponent # if the value is default (e.g dead vehicles), do not modify
     # vehicle type (player, ally, enemy) 
     if vehicleId is None:
         # vehicle call from __reload (hangar)
@@ -170,45 +251,87 @@ def modifyOutfitComponent(outfitComponent, vehicleId=None):
         vehicleType = TYPE_ALLY # is allied vehicle (arena)
     else:
         vehicleType = TYPE_ENEMY # is enemy vehicle (arena)
+    #try:
+    #    print("Vehicle type {:s} with name {:s}".format(vehicleType, vehicleDescriptor.type.name))
+    #except Exception as e:
+    #    print("Error @replaceOwnCustomization: " + str(e))
+    if not checkList(vehicleType, vehicleDescriptor):
+        # when False, either not in whitelist or in blacklist, do not modify
+        return outfitComponent
     # override decals (in battle only; when the decal value is not None or 0)
+    # decal could be inscriptions or emblem; only replace the latter by locating their corresponding regions
     if tryGetDecal(vehicleType):
-        if(BigWorld.forcedCustomizationDict[FORCED_BOTH_LOOKUP[vehicleType]] and len(outfitComponent.decals) < 2):
-            # add in turret regions. They don't need to have values, since the ids are overwritten anyway
-            if(len(outfitComponent.decals) == 0):
-                outfitComponent.decals.append(DecalComponent(id=-1, appliedTo=ApplyArea.TURRET))
-            outfitComponent.decals.append(DecalComponent(id=-1, appliedTo=ApplyArea.TURRET_1))
+        emblem_regions_val, inscription_regions_val = getAvailableDecalRegions(vehicleDescriptor)
+        existing_emblems = [emb for emb in outfitComponent.decals if emb.appliedTo & emblem_regions_val]
+        replacing_emblems = existing_emblems # [ DecalComponent(id=e.id, appliedTo=reg) for e in existing_emblems for reg in decomposeApplyAreaRegion(e.appliedTo, ApplyArea.EMBLEM_REGIONS) ]
+        original_decals = list(outfitComponent.decals)
+        # print("Debug @replaceOwnCustomization: existing emblem regions {}, replacing emblem regions {}".format(existing_emblems, replacing_emblems))
+        current_emblem_val = sum(emb.appliedTo for emb in existing_emblems)
+        if(emblem_regions_val < current_emblem_val):
+            # this shouldn't happen; log it when it does
+            print("Error @replaceOwnCustomization: current emblem encompassing regions {}; while possible emblems encompass {}".format(current_emblem_val, emblem_region_val))
+        elif(BigWorld.forcedCustomizationDict[FORCED_BOTH_LOOKUP[vehicleType]] and emblem_regions_val > current_emblem_val):
+            # when this two values are mismatched, creating new DecalComponent to house needed emblems
+            added_emblems = [DecalComponent(id=-1, appliedTo=reg) for reg in decomposeApplyAreaRegion(emblem_regions_val - current_emblem_val, ApplyArea.EMBLEM_REGIONS)]
+            # outfitComponent.decals.extend(added_emblems)
+            replacing_emblems.extend(added_emblems)
         decal_idx = tryGetDecal(vehicleType)
         if(isinstance(decal_idx, tuple)):
             # replace both using matching.
-            for decal_item, new_idx in zip(outfitComponent.decals, decal_idx):
+            for decal_item, new_idx in zip(replacing_emblems, decal_idx):
                 if(new_idx != 0): # ignore zero
                     decal_item.id = new_idx
         else:
             # replace both using one
-            for decal_item in outfitComponent.decals:
+            for decal_item in replacing_emblems:
                 decal_item.id = decal_idx
+        # remove existing, add the replaced version. Note: this isn't needed for several versions already
+        # del [d for d in outfitComponent.decals if d in existing_emblems][:]
+        # outfitComponent.decals.extend(replacing_emblems)
         # remove nonpositive ids (for -1, but can also deal with errant -2)
         del [d for d in outfitComponent.decals if d.id <= 0][:]
+        print("Debug @replaceOwnCustomization: before modifications {}, after modification {}".format(original_decals, outfitComponent.decals))
     # override camo (also in battle only)
     if getCamoOrPaint(vehicleType, type_dict=CAMO_TYPE_LOOKUP):
         camo_idx = getCamoOrPaint(vehicleType, type_dict=CAMO_TYPE_LOOKUP)
-        del outfitComponent.camouflages[:]
+        if(camo_idx != 0): # only keep on replace
+            del outfitComponent.camouflages[:]
         if(camo_idx > 0): # -1 will disable camo
             outfitComponent.camouflages.extend([CamouflageComponent(id=camo_idx, appliedTo=area) for area in (ApplyArea.HULL, ApplyArea.TURRET, ApplyArea.GUN)])
     # override paint (also in battle only)
     if getCamoOrPaint(vehicleType, type_dict=PAINT_TYPE_LOOKUP):
         paint_idx = getCamoOrPaint(vehicleType, type_dict=PAINT_TYPE_LOOKUP)
-        del outfitComponent.paints[:]
+        if(paint_idx != 0): # only keep on replace
+            del outfitComponent.paints[:]
         if(paint_idx > 0): # -1 will disable paint
             outfitComponent.paints.extend([PaintComponent(id=paint_idx, appliedTo=area) for area in (ApplyArea.HULL, ApplyArea.TURRET, ApplyArea.GUN)])
         
+    if(vehicleType == TYPE_SELF and BigWorld.forcedCustomizationDict.get("playerPersonalNumberID", None)):
+        # Experimental: attempt to add number components to all self's vehicles on valid slots
+        emblem_regions_val, inscription_regions_val = getAvailableDecalRegions(vehicleDescriptor)
+        current_inscription_val = sum(ins.appliedTo for ins in outfitComponent.decals if ins.appliedTo & inscription_regions_val)
+        available_inscription_slots = set(decomposeApplyAreaRegion(inscription_regions_val, ApplyArea.INSCRIPTION_REGIONS)) - set(decomposeApplyAreaRegion(current_inscription_val, ApplyArea.INSCRIPTION_REGIONS))
+        print("Debug @replaceOwnCustomization: available inscriptions: {} {} - {}".format(available_inscription_slots, inscription_regions_val, current_inscription_val))
+        if(len(available_inscription_slots) == 0):
+            print("Debug @replaceOwnCustomization: No available slot to add personal number. Ignoring the positions")
+        else:
+            personal_numbers_id = BigWorld.forcedCustomizationDict["playerPersonalNumberID"]
+            personal_number_value = BigWorld.forcedCustomizationDict["playerPersonalNumber"]
+            if(personal_number_value == RANDOMIZE):
+                numberval = random.randint(1000) # random mode, picking a random value.
+            elif(personal_number_value == HASH): 
+                numberval = (id(vehicleDescriptor) * id(ApplyArea) + id(BigWorld)) % 1000 # hash mode; TODO try something more randomized?
+            else:
+                numberval = personal_number_value % 1000
+            numberstr = "{:03d}".format(numberval) # include leading zeros if needed. TODO enforce digit version?
+            outfitComponent.personal_numbers.append( PersonalNumberComponent(id=personal_numbers_id, number=numberstr, appliedTo=list(available_inscription_slots)[0]) )
     # INJECTION FINISHED
     return outfitComponent
 
 old_prepareBattleOutfit = camouflages.prepareBattleOutfit
 def new_prepareBattleOutfit(outfitCD, vehicleDescriptor, vehicleId):
     outfit = old_prepareBattleOutfit(outfitCD, vehicleDescriptor, vehicleId)
-    outfit_new_components = modifyOutfitComponent(outfit.pack(), vehicleId)
+    outfit_new_components = modifyOutfitComponent(outfit.pack(), outfitCD=outfitCD, vehicleDescriptor=vehicleDescriptor, vehicleId=vehicleId)
     return Outfit(component=outfit_new_components, vehicleCD=outfit.vehicleCD)
     
 camouflages.prepareBattleOutfit = new_prepareBattleOutfit
@@ -221,6 +344,15 @@ def new_reload_HangarVehicleAppearance(self, vDesc, vState, outfit):
         outfit_new_components = modifyOutfitComponent(outfit.pack(), None)
         return Outfit(component=outfit_new_components, vehicleCD=outfit.vehicleCD)
 # HangarVehicleAppearance.__reload = new_reload_HangarVehicleAppearance
+
+
+        for partName in CUSTOMIZATION_SLOTS_VEHICLE_PARTS:
+            list_positions = getattr(vehicleDescriptor, partName).emblemSlots 
+            available_positions = [slot for slot in list_positions if slot.type == SLOT_TYPE_NAMES.INSCRIPTION]
+            if len(available_positions) > 0:
+                print("Debug @replaceOwnCustomization: partName {:s} has {:d} available slots for personal number.".format(partName, len(available_positions)))
+            #print("Debug @replaceOwnCustomization: all slots {}".format( [slot.type for slot in list_positions]))
+        print("Debug for application positions: {}".format([(c.id, c.number, c.appliedTo) for c in outfitComponent.personal_numbers]))
 """
 
 # No longer used (prototype concept test)

@@ -1,12 +1,22 @@
 - Not showing anything
  -> Possible minimized scale due to inches. Check Configure -> Unit Setup -> System Unit Setup
 - Cannot export .visual
- -> Go to Customize -> Config System Paths -> 3rd Party Plugin -> add the /bigword/tools/exporter/version from BigWorld 2.1
+ -> Go to Customize -> Config System Paths -> 3rd Party Plugin -> add the /bigworld/tools/exporter/version from BigWorld 2.1
 - Not valid material link: (absolule link to .png making export failure)
  -> Rendering -> Material Editor -> Photometric/Bitmap Path -> Strip All Paths 
 - Crash upon F5/Entering with no log
  Possible missing hardpoint (HP). Check HP_gunJoint in turret, etc.
  
+- Blank camo on turret/hull/etc.
+Issue caused by texture larger than camo appliance size (aoTextureSize field); resize it to correct level. 
+ 
+- Editing UV mapping using .ms script: 
+After scaling, resize corresponding dds (AM, AMM, AO, GMM) to the ratio you want. E.g if you resized to 4x4, every images should be topleft 1x1 of the new images' 4x4
+
+- Weird shade?
+Currently fixed by removing normal map. See below for possible fix
+https://www.youtube.com/watch?v=GBnMEXhHtxg
+
 - Animate antenna:
  + Create two bones @ root and tip (Create -> System -> Bones IK chain). Can create multiple bones, but should only assign those two to the mesh
  + Select all antenna vertices; Modifier List -> Skin. Add the two bones to the mesh.
@@ -14,10 +24,19 @@
  + Adjust the root bone so the outer envelope cover the whole antenna; long-press falloff (third button in Envelope Properties) and select quick falloff
  + Adjust the tip bone, also use the outer envelope on the whole antenna, long-press falloff and either use linear or quick falloff. Quick is more conservative; Linear introduce some sort of "bounce" on the lower section.
  + NOTE: Make sure to change the fx to the skinned version when copying material from original
+
+- Pivoting tilted 3D objects (for miniturrets, autorotors, etc.).
+ + Create a Working pivot, and align it manually until you can turn the objects using that pivot
+ + Go into Edit Working Pivot and turn on MAXScript Listener
+ + Retrieve orientation and location of it (the currently selected Working Pivot) using `quatToEuler2 $.transform.rotation` and `$.pos`
+ + Select the object, set to Affect Pivot only, and copy these params down on the object Pivot
+
  
 Making SWF:
 Compile the python binding with compileall
-C:\Python27\python.exe -m compileall py\mod_UML_interface.py
+C:\Python27\python.exe -m compileall mod_UML_interface.py
+Additionally, to pack into independent .wotmod
+py pyc_to_wotmod.py mod_replaceOwnCustomization.pyc
 
 Compile the swf, with its external swc(s) are found in gui-part1/2.pkg; stand in `root` folder (you should see the `as3` folder)
 D:\Archive\flex_sdk_4.6.0.23201B\bin\mxmlc  -compiler.source-path=as3 -compiler.external-library-path+=as3\lib\common-1.0-SNAPSHOT.swc,as3\lib\gui_base-1.0-SNAPSHOT.swc -static-link-runtime-shared-libraries=true -o as3\UML_MainGUI.swf as3\uml\UML_MainGUI.as
@@ -50,6 +69,18 @@ AO map:
 - G is Ambient Occlusion, ie shadow from global illumination. White will receive propotionally less shadow than black
 - B is mud exclusion map. White will not receive mud.
 - A is camouflage exclusion map. Black will not receive camo.
+
+GMM map:
+- R is gloss map - white will be more reflective (white is glass-like)
+- G is metallic map - white will look more like bare metal
+- B is paint exclusion map. Black will not receive paint
+
+How to do fading:
+- Have unfaded
+- Add Layer Mask, (recommend to do full transparency)
+- Noise -> Plasma, change seed + turbulence until the regions look fine
+- Color -> Curve, reorganize as wanted
+- If want to copy one mask to another, do Layer to Selection, then Add Layer Mask with "Selection" option
 
 OTHER:
 Soviet sticker: 15924, 15872, 15877 looks great; 15926 is a plain, faded white star

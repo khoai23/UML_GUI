@@ -235,6 +235,8 @@ def decomposeApplyAreaRegion(combinedRegionValue, regionList=ApplyArea.RANGE):
     # Because WoT already forced emblems and inscriptions to separate regions; it use appliedTo on this combined value (e.g TURRET & TURRET_1 is 512 + 256)
     # we can simply AND (&) every individual positions. Can feed a regionList if we KNOW what component it is.
     # print("Debug @decomposeApplyAreaRegion: ", combinedRegionValue, regionList)
+    if(combinedRegionValue <= 0):
+        return []
     return [r for r in regionList if r & combinedRegionValue]
 
 def modifyOutfitComponent(outfitComponent, outfitCD=None, vehicleDescriptor=None, vehicleId=None):
@@ -290,7 +292,7 @@ def modifyOutfitComponent(outfitComponent, outfitCD=None, vehicleDescriptor=None
         # outfitComponent.decals.extend(replacing_emblems)
         # remove nonpositive ids (for -1, but can also deal with errant -2)
         del [d for d in outfitComponent.decals if d.id <= 0][:]
-        print("Debug @replaceOwnCustomization: before modifications {}, after modification {}".format(original_decals, outfitComponent.decals))
+        # print("Debug @replaceOwnCustomization: before modifications {}, after modification {}".format(original_decals, outfitComponent.decals))
     # override camo (also in battle only)
     if getCamoOrPaint(vehicleType, type_dict=CAMO_TYPE_LOOKUP):
         camo_idx = getCamoOrPaint(vehicleType, type_dict=CAMO_TYPE_LOOKUP)
@@ -309,7 +311,7 @@ def modifyOutfitComponent(outfitComponent, outfitCD=None, vehicleDescriptor=None
     if(vehicleType == TYPE_SELF and BigWorld.forcedCustomizationDict.get("playerPersonalNumberID", None)):
         # Experimental: attempt to add number components to all self's vehicles on valid slots
         emblem_regions_val, inscription_regions_val = getAvailableDecalRegions(vehicleDescriptor)
-        current_inscription_val = sum(ins.appliedTo for ins in outfitComponent.decals if ins.appliedTo & inscription_regions_val)
+        current_inscription_val = sum(ins.appliedTo for ins in outfitComponent.decals if ins.appliedTo in ApplyArea.INSCRIPTION_REGIONS)
         available_inscription_slots = set(decomposeApplyAreaRegion(inscription_regions_val, ApplyArea.INSCRIPTION_REGIONS)) - set(decomposeApplyAreaRegion(current_inscription_val, ApplyArea.INSCRIPTION_REGIONS))
         print("Debug @replaceOwnCustomization: available inscriptions: {} {} - {}".format(available_inscription_slots, inscription_regions_val, current_inscription_val))
         if(len(available_inscription_slots) == 0):

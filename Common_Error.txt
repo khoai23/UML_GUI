@@ -31,12 +31,14 @@ https://www.youtube.com/watch?v=GBnMEXhHtxg
  + Retrieve orientation and location of it (the currently selected Working Pivot) using `quatToEuler2 $.transform.rotation` and `$.pos`
  + Select the object, set to Affect Pivot only, and copy these params down on the object Pivot
 
- 
-Making SWF:
-Compile the python binding with compileall
-C:\Python27\python.exe -m compileall mod_UML_interface.py
+Forced customization:
+C:\Python27\python.exe -m compileall mod_replaceOwnCustomization.py
 Additionally, to pack into independent .wotmod
 py pyc_to_wotmod.py mod_replaceOwnCustomization.pyc
+ 
+Making SWF GUI:
+Compile the python binding with compileall
+C:\Python27\python.exe -m compileall py\mod_UML_interface.py
 
 Compile the swf, with its external swc(s) are found in gui-part1/2.pkg; stand in `root` folder (you should see the `as3` folder)
 D:\Archive\flex_sdk_4.6.0.23201B\bin\mxmlc  -compiler.source-path=as3 -compiler.external-library-path+=as3\lib\common-1.0-SNAPSHOT.swc,as3\lib\gui_base-1.0-SNAPSHOT.swc -static-link-runtime-shared-libraries=true -o as3\UML_MainGUI.swf as3\uml\UML_MainGUI.as

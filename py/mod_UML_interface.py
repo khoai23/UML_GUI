@@ -55,7 +55,8 @@ class UML_MainGUI(UML_mainMeta):
         self.metakey = {"remodelsFilelist" : "configLib"} # keys that will be written to sectionMeta
         self.mainkey = {"affectHangar":"affectHangar", 
                         "useUMLSound":"useUMLSound", 
-                        "MOErank": "MOE_rank"
+                        "MOErank": "MOE_rank",
+                        "ignoreList": "ignoreList"
                        } # keys that will be written to sectionMain
         
         # self.dumpCamouflageData()
@@ -198,13 +199,21 @@ class UML_MainGUI(UML_mainMeta):
             elif(valuetype == int):
                 return section.readInt(valuename, default)
             elif(valuetype == str or valuetype == unicode):
-                return section.readString(valuename)
+                return section.readString(valuename, default)
             elif(valuetype == float):
                 return section.readFloat(valuename, default)
             elif(valuetype == (tuple, int)):
                 return _xml.readTupleOfInts(sectionCtx, section, valuename, tuplesize)
             elif(valuetype == (tuple, float)):
                 return _xml.readTupleOfFloats(sectionCtx, section, valuename, tuplesize)
+            elif(valuetype == (tuple, str)):
+                unparsed = section.readString(valuename, "").strip()
+                if("," in unparsed): # split by , if exist
+                    return [part.strip() for part in unparsed.split(",")]
+                elif(" " in unparsed): # split by \s next
+                    return [part.strip() for part in unparsed.split(",")]
+                else: # no delimiter, single value
+                    return [unparsed]
             else:
                 raise ValueError("Unknown type {} set.".format(valuetype))
         else:
@@ -228,6 +237,10 @@ class UML_MainGUI(UML_mainMeta):
                 parent = self.readValueFromSection(section, "parent", str, sectionCtx=profileCtx, default="invalid_parent_str")
                 if(parent != "invalid_parent_str"):
                     new_config["parent"] = parent
+                    # also add in hull, turret and gun relative to the 
+                    new_config["hull"] = self.readValueFromSection(section, "hull", str, sectionCtx=profileCtx, default=parent)
+                    new_config["turret"] = self.readValueFromSection(section, "turret", str, sectionCtx=profileCtx, default=parent)
+                    new_config["gun"] = self.readValueFromSection(section, "gun", str, sectionCtx=profileCtx, default=parent)
                 # if name or parent is WOT's known vehicle, allow a read of configString
                 if(name in self._code_to_tank.keys() or parent in self._code_to_tank.keys()):
                     new_config["configString"] = self.readValueFromSection(section, "configString", str, sectionCtx=profileCtx, default="9999")
@@ -310,6 +323,7 @@ class UML_MainGUI(UML_mainMeta):
         config['listProfileObjects'] = self.retrieveProfileSettings(self.sectionMainModel)
         config['forcedCustomization'] = self.retrieveForcedConfigSettings()
         config['remodelsFilelist'] = self.readValueFromSection(self.sectionMeta, "configLib", str, sectionCtx=None, default="placeholder_list_of_libs")
+        config['ignoreList'] = self.readValueFromSection(self.sectionMain, "ignoreList", (tuple, str), sectionCtx=None, default=[])
         return json.dumps(config)
     
     def getVehicleSelectorDataFromPy(self):
@@ -357,9 +371,6 @@ class UML_MainGUI(UML_mainMeta):
                }
         
     def getHangarVehicleFromPy(self):
-        # for fielddata in inspect.getmembers(g_currentVehicle.item.descriptor):
-        #    print("g_currentVehicle.item.descriptor :" + str(fielddata))
-        
         try:
             return g_currentVehicle.item.name.split(":")[-1].strip()
         except Exception as e:
@@ -371,6 +382,9 @@ class UML_MainGUI(UML_mainMeta):
             return ["No Style"] + self._list_styles[profilename]
         else:
             return None
+        
+    def checkIsValidWoTVehicleAtPy(self, profilename):
+        return profilename in self._code_to_tank
         
     def debugEvalCommand(self, execCmd, evalCmd):
         exec(execCmd)

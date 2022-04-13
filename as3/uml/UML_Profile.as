@@ -26,7 +26,7 @@ package uml
 			super.configUI();
 		    DebugUtils.LOG_WARNING("UML_Profile configUI called for object: " + App.utils.JSON.encode(this.data));
 			this.profileIcon = addChild(App.utils.classFactory.getComponent(App.utils.classFactory.getClassName(UILoaderAlt), UILoaderAlt, 
-			{ "x": 0, "y": 0, "source": "../maps/icons/vehicle/noImage.png", "sourceAlt": "../maps/icons/vehicle/noImage.png"})) as UILoaderAlt;
+			{ "x": 0, "y": 0, "source": "gui/maps/icons/vehicle/noImage.png", "sourceAlt": "gui/maps/icons/vehicle/noImage.png"})) as UILoaderAlt;
 			this.profileNameTF = addChild(App.utils.classFactory.getComponent(App.utils.classFactory.getClassName(LabelControl), LabelControl, 
 			{ "x": 0, "y": 100, "text": "Placeholder profile label" })) as LabelControl;
 			this.width = 1400;
@@ -40,9 +40,9 @@ package uml
 		    DebugUtils.LOG_WARNING("UML_Profile setData called for object: " + App.utils.JSON.encode(objdata));
 			this.data = objdata;
 			//this.profileNameTF.text = this.data.profile_name
-			this.profileIcon.sourceAlt = "../maps/icons/vehicle/noImage.png";
+			this.profileIcon.sourceAlt = "gui/maps/icons/vehicle/noImage.png";
 			try {
-				this.profileIcon.source = "../maps/icons/vehicle/" + this.data.nation_name + "-" + this.data.profile_name + ".png";  // should be 160x100 img
+				this.profileIcon.source = "gui/maps/icons/vehicle/" + this.data.nation_name + "-" + this.data.profile_name + ".png";  // should be 160x100 img
 			} catch (e : Error) { // doesn't happen, but might as well.
 				DebugUtils.LOG_ERROR("ProfileIcon load error, stack trace:"  + e.getStackTrace())
 				this.profileIcon.startLoadAlt()

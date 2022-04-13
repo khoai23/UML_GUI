@@ -18,7 +18,7 @@ import re
 _multispace_regex = re.compile("\s+")
 import inspect
 
-__all__ = ('UML_main', )
+__all__ = ('UML_MainGUI', )
 
 def getTextureFilename(tfn):
     # should have slash at front and dot at back
@@ -30,18 +30,20 @@ def getTextureFilename(tfn):
 
 class UML_mainMeta(AbstractWindowView):
     def onWindowClose(self):
-        print("onWindowClose called")
+        # print("onWindowClose called")
         self.destroy()
         
     def onWindowMinimize(self):
-        print("onWindowMinimize called")
+        # print("onWindowMinimize called")
+        pass
         
     def onTryClosing(self):
-        print("onTryClosing called.")
+        # print("onTryClosing called.")
         return True
         
     def onSourceLoaded(self):
-        print("onSourceLoaded called")
+        # print("onSourceLoaded called")
+        pass
 
 class UML_MainGUI(UML_mainMeta):
     def __init__(self, *args, **kwargs):
@@ -122,6 +124,9 @@ class UML_MainGUI(UML_mainMeta):
         except AttributeError as e:
             print("[UML GUI] decal read error: {} {} {} {}".format(e, k, v, v.i18n))
         
+        # matching progression styles. TODO check for vehicle names as well 
+        self._progression_styles = set([stl.modelsSet for stl in vehicles.g_cache.customization20().styles.values() if stl.isProgression])
+        
     def printObjToLog(self, obj):
         print("[UML GUI] printObjToLog, obj found: ", obj, type(obj))
     
@@ -148,25 +153,6 @@ class UML_MainGUI(UML_mainMeta):
             usedSection.writeString(truekey, ", ".join(str(v) for v in value) )
         else:
             print("[UML GUI] Unknown type {} of value {}, can't write to chosen section.".format(type(value), value))
-    
-    def updateForcedCustomization(self, customizationdata, mainSection):
-        # print("[UML GUI] debug: ", customizationdata)
-        if(customizationdata):
-            for namespace, datadict in zip(["player", "ally", "enemy"], customizationdata):
-                for field, value in datadict.items():
-                    if(isinstance(value, (tuple, list))):
-                        if all((v == -2 for v in value[1:])):
-                            # if all other values has -2, collapse to only one value
-                            value = value[0]
-                        else:
-                            # if not, copy all the -2 with the base
-                            value = tuple([v if v != -2 else value[0] for v in value])
-                    self.writeDataToSection("{:s}/{:s}".format(namespace, field), value, usedSection=mainSection)
-                    # print("[UML GUI] debug write to section {}/{} {} ({})".format(namespace, field, value, type(value)))
-                    # TODO maybe update the dict here instead of `UML_reload_func`?
-        else:
-            pass # do nothing when this customization data doesn't exist
-            
     @property
     def currentOMObject(self):
         if(hasattr(BigWorld, "om")):
@@ -180,7 +166,7 @@ class UML_MainGUI(UML_mainMeta):
         return getattr(self.currentOMObject, "isDebug", False)
     
     def forcedCustomizationIsAvailableAtPy(self):
-        return hasattr(BigWorld, "forcedCustomizationDict")
+        return False
     
     @staticmethod
     def openXMLConfig(fullpath):
@@ -211,7 +197,7 @@ class UML_MainGUI(UML_mainMeta):
                 if("," in unparsed): # split by , if exist
                     return [part.strip() for part in unparsed.split(",")]
                 elif(" " in unparsed): # split by \s next
-                    return [part.strip() for part in unparsed.split(",")]
+                    return [part.strip() for part in unparsed.split(" ") if part.strip() != ""]
                 else: # no delimiter, single value
                     return [unparsed]
             else:
@@ -232,15 +218,26 @@ class UML_MainGUI(UML_mainMeta):
                                 "camouflageID": self.readValueFromSection(section, "camouflageID", int, sectionCtx=profileCtx, default=0),
                                 "paintID": self.readValueFromSection(section, "paintID", int, sectionCtx=profileCtx, default=0),
                                 "styleSet": self.readValueFromSection(section, "styleSet", str, sectionCtx=profileCtx, default="0"),
+                                "styleProgression": self.readValueFromSection(section, "styleProgression", str, sectionCtx=profileCtx, default="4"),
+                                "alignToTurret": self.readValueFromSection(section, "alignToTurret", bool, sectionCtx=profileCtx, default=False),
                              }
                 # add, read parent; if exist, add it to the config structure
                 parent = self.readValueFromSection(section, "parent", str, sectionCtx=profileCtx, default="invalid_parent_str")
                 if(parent != "invalid_parent_str"):
                     new_config["parent"] = parent
-                    # also add in hull, turret and gun relative to the 
+                    # also add in hull, turret and gun for hybrid vehicles
                     new_config["hull"] = self.readValueFromSection(section, "hull", str, sectionCtx=profileCtx, default=parent)
                     new_config["turret"] = self.readValueFromSection(section, "turret", str, sectionCtx=profileCtx, default=parent)
                     new_config["gun"] = self.readValueFromSection(section, "gun", str, sectionCtx=profileCtx, default=parent)
+                    new_config["hullStyle"] = self.readValueFromSection(section, "hullStyle", str, sectionCtx=profileCtx, default="0")
+                    new_config["turretStyle"] = self.readValueFromSection(section, "turretStyle", str, sectionCtx=profileCtx, default="0")
+                    new_config["gunStyle"] = self.readValueFromSection(section, "gunStyle", str, sectionCtx=profileCtx, default="0")
+                    # if hull/turret/gun exists (hybrid vehicle), styleSet is converted to GUI-only chassisStyle
+                    if any( (section.has_key(k) for k in ("hull", "turret", "gun")) ):
+                        new_config["chassisStyle"] = new_config["styleSet"]
+                        new_config["styleSet"] = "0"
+                    else:
+                        new_config["chassisStyle"] = "0"
                 # if name or parent is WOT's known vehicle, allow a read of configString
                 if(name in self._code_to_tank.keys() or parent in self._code_to_tank.keys()):
                     new_config["configString"] = self.readValueFromSection(section, "configString", str, sectionCtx=profileCtx, default="9999")
@@ -249,28 +246,6 @@ class UML_MainGUI(UML_mainMeta):
         else:
             print("[UML GUI] Error @retrieveProfileSettings: xmlConfigObj is not available.")
             return []
-    
-    def retrieveForcedConfigSettings(self):
-        if(self.forcedCustomizationIsAvailableAtPy()):
-            config = [{}, {}, {}]
-            customization_dict = BigWorld.forcedCustomizationDict
-            if("playerForcedEmblem" not in customization_dict):
-                # Ignore the usual lazyload - call the reload func immediately
-                BigWorld.forcedCustomizationDict["UML_reload_func"]()
-            # print("Customization dict: {}".format(customization_dict))
-            for idx, namespace in enumerate(["player", "ally", "enemy"]):
-                for field, size in [("forcedEmblem", 2), ("forcedBothEmblem", None), ("forcedCamo", 3), ("forcedPaint", 3)]:
-                    truefield = field[:1].upper() + field[1:]
-                    config[idx][field] = value = customization_dict.get("{:s}{:s}".format(namespace, truefield), 0)
-                    # print("Try loading {:s}{:s} from customization dict, result: {}".format(namespace, truefield, value))
-                    if(config[idx][field] is None): # None and 0 are functionally the same thing
-                        config[idx][field] = 0
-                    if(isinstance(config[idx][field], int) and size and size > 1):
-                        # duplicate to help the GUI not messing up; thankfully the forcedBothEmblem is bool
-                        config[idx][field] = tuple([config[idx][field]] + [-2] * (size - 1))
-            return config
-        else:
-            return None
             
     def receiveStringConfigAtPy(self, strconf):
         if self._isDAAPIInited():
@@ -281,22 +256,11 @@ class UML_MainGUI(UML_mainMeta):
                 return
             # lastProfileSelectedIdx should be popped as it is game instance setting, not worth keeping in UML
             self.currentOMObject.lastProfileSelectedIdx = jsondata.pop('lastProfileSelectedIdx', 0)
-            # forcedCustomization should be converted
-            self.updateForcedCustomization(jsondata.pop('forcedCustomization', None), self.sectionMain)
             # model data should be popped as well
             model_data = jsondata.pop("listProfileObjects", [])
             sectiondict = {k: v for k, v in _xml.getChildren(self.configCtx, self.sectionMain, 'models')} # convert list to dictionary
-            for modelconf in model_data:
-                # write the modified values
-                pname = modelconf.pop("name")
-                xmlname = 'models/' + str(pname)
-                if(not self.sectionMain.has_key(xmlname) or pname not in sectiondict): # new config, create and update the sectiondict again
-                    print("[UML GUI] XML name used for createSection: {} {}".format(xmlname, type(xmlname)))
-                    self.sectionMain.createSection(xmlname)
-                    sectiondict = {k: v for k, v in _xml.getChildren(self.configCtx, self.sectionMain, 'models')}
-                section = sectiondict[pname]
-                for headerkey, headervalue in modelconf.items(): # write all other options other than name
-                    self.writeDataToSection(headerkey, headervalue, usedSection=section)
+            for modelconf in model_data: # update individual model
+                self.updateModel(modelconf, sectiondict, main_section=self.sectionMain, ctx=self.configCtx)
             for key, value in jsondata.items(): # update everything else in xml
                 self.writeDataToSection(key, value)
             self.sectionMain.save(); self.sectionMeta.save();
@@ -305,10 +269,7 @@ class UML_MainGUI(UML_mainMeta):
             # rerun the loadConfig and refresh model accordingly. 
             # TODO maybe we don't have to reload if the libModel isn't updated?
             self.currentOMObject.loadConfig()
-            g_currentVehicle.refreshModel()    
-            # additionally, if replaceOwnCustomization mod exist, attempt to reload its configuration as well.
-            if(hasattr(BigWorld, "forcedCustomizationDict")):
-                BigWorld.forcedCustomizationDict["UML_reload_func"]()
+            g_currentVehicle.refreshModel()
         else:
             jsondata = None
     
@@ -321,7 +282,7 @@ class UML_MainGUI(UML_mainMeta):
         config['lastProfileSelectedIdx'] = getattr(om, 'lastProfileSelectedIdx', 0)
         
         config['listProfileObjects'] = self.retrieveProfileSettings(self.sectionMainModel)
-        config['forcedCustomization'] = self.retrieveForcedConfigSettings()
+        config['forcedCustomization'] = None
         config['remodelsFilelist'] = self.readValueFromSection(self.sectionMeta, "configLib", str, sectionCtx=None, default="placeholder_list_of_libs")
         config['ignoreList'] = self.readValueFromSection(self.sectionMain, "ignoreList", (tuple, str), sectionCtx=None, default=[])
         return json.dumps(config)
@@ -362,6 +323,43 @@ class UML_MainGUI(UML_mainMeta):
         profilexmlname = 'models/' + profilename
         self.sectionMain.deleteSection(profilexmlname)
     
+    HYBRID_FIELDS = ("hull", "gun", "turret", "hullStyle", "gunStyle", "turretStyle", "chassisStyle")
+    def updateModel(self, model_obj, sectiondict, main_section=None, ctx=None):
+        main_section, ctx = main_section or self.sectionMain, ctx or self.configCtx
+        # write the modified values
+        pname = model_obj.pop("name")
+        xmlname = 'models/' + str(pname)
+        if(not main_section.has_key(xmlname) or pname not in sectiondict): # new config, create and update the sectiondict again
+            print("[UML GUI] XML name used for createSection: {} {}".format(xmlname, type(xmlname)))
+            main_section.createSection(xmlname)
+            sectiondict = {k: v for k, v in _xml.getChildren(ctx, main_section, 'models')}
+        section = sectiondict[pname]
+        # split to handle styleSet >< hybrid fields
+        if(pname not in self._code_to_tank and model_obj.get("parent", "invalid_parent_str") not in self._code_to_tank):
+            # is UMLProfiles, do not allow either styleSet or hybrid
+            for f in UML_MainGUI.HYBRID_FIELDS:
+                section.deleteSection(f)
+            section.deleteSection("styleSet")
+            model_obj = {k: v for k, v in model_obj.items() if k not in UML_MainGUI.HYBRID_FIELDS and k != "styleSet"}
+        elif (model_obj.get("styleSet", "0") == "0" and model_obj.get("parent", None)):
+            # no styleSet with parent, remove styleSet field and allow hybrids (hull/gun/turret[Style])
+            # chassisStyle will be converted to styleSet in this configuration
+            # section.deleteSection("styleSet")
+            model_obj["styleSet"] = model_obj.pop("chassisStyle", "0")
+        else:
+            # existing styleSet option, purge (hull/gun/turret[Style])
+            for f in UML_MainGUI.HYBRID_FIELDS:
+                section.deleteSection(f)
+            model_obj = {k: v for k, v in model_obj.items() if k not in UML_MainGUI.HYBRID_FIELDS}
+        if(model_obj.get("styleSet", None) not in self._progression_styles):
+            # if the styleSet does not exist or not belong to the known styles, disable and remove styleProgression received
+            # this doesn't need to work actually
+            section.deleteSection("styleProgression")
+            model_obj.pop("styleProgression", None)
+        # write all remaining fields.
+        for headerkey, headervalue in model_obj.items(): # write all other options other than name
+            self.writeDataToSection(headerkey, headervalue, usedSection=section)
+        
     def loadCustomizationDataFromPy(self):
         camoID, camoName = zip(*self._camo_list)
         paintID, paintName = zip(*self._paint_list)
@@ -394,7 +392,7 @@ class UML_MainGUI(UML_mainMeta):
     
 """Add binding from the AS's UML_MainGUI class to the current python UML_MainGUI class"""
 g_entitiesFactories.addSettings(ViewSettings("UML_MainGUI", UML_MainGUI, 'UML_MainGUI.swf',
-                        WindowLayer.WINDOW, None, ScopeTemplates.GLOBAL_SCOPE, isModal=True, canClose=True, canDrag=False))
+                        WindowLayer.WINDOW, None, ScopeTemplates.GLOBAL_SCOPE, isModal=True, canClose=True, canDrag=True))
 
 
 def showManager():
@@ -408,4 +406,4 @@ try:
     from gui.modsListApi import g_modsListApi
     g_modsListApi.addModification(id='UML_MainGUI', name='UML (GUI Interface)', description='GUI for Universal Model Loader', icon='maps/UML_alpha.png', enabled=True, login=False, lobby=True, callback=showManager)
 except ImportError:
-    print '[UML] No modsListApi found.'
+    print '[UML GUI] No modsListApi found.'

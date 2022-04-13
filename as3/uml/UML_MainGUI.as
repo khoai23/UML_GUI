@@ -5,10 +5,10 @@ package uml
    import flash.utils.getQualifiedClassName;
    import flash.events.Event;
    import flash.text.TextFieldAutoSize;
+   import scaleform.clik.events.ButtonEvent;
    import scaleform.clik.events.ListEvent;
    import scaleform.clik.events.FocusHandlerEvent;
    import scaleform.gfx.TextFieldEx;
-   import scaleform.clik.events.ButtonEvent;
    import scaleform.clik.controls.ScrollingList;
    //import scaleform.clik.controls.TextInput;
    import scaleform.clik.core.UIComponent;
@@ -53,9 +53,10 @@ package uml
 	  public var toggle_show_ignore: CheckBox;
 	  
 	  public var current_profile_name : TextInput;
+	  public var current_profile_ignore: CheckBox;
 	  public var current_profile_enable : CheckBox;
 	  public var current_profile_swapNPC : CheckBox;
-	  public var current_profile_ignore: CheckBox;
+	  public var current_profile_alignToTurret : CheckBox;
 	  public var current_profile_usewhitelist : CheckBox;
 	  public var current_profile_target : TextInput;
 	  public var current_profile_target_help : LabelControl;
@@ -64,6 +65,7 @@ package uml
 	  public var current_profile_paint : DropdownMenu;
 	  public var current_profile_paint_help : LabelControl;
 	  public var current_profile_style : DropdownMenu;
+	  public var current_profile_style_progression : TextInput;
 	  public var current_profile_style_help : LabelControl;
 	  public var current_profile_configString : TextInput;
 	  public var current_profile_configString_help : LabelControl;
@@ -71,14 +73,21 @@ package uml
 	  public var use_hangar_vehicle : SoundButtonEx;
 	  
 	  public var hybrid_help : LabelControl;
-	  public var profile_hull_help : LabelControl;
-	  public var profile_hull : TextInput;
 	  public var profile_chassis_help : LabelControl;
 	  public var profile_chassis : TextInput;
+	  public var profile_chassis_style: DropdownMenu;
+	  public var profile_hull_help : LabelControl;
+	  public var profile_hull : TextInput;
+	  public var profile_hull_from_selector: SoundButtonEx;
+	  public var profile_hull_style: DropdownMenu;
 	  public var profile_turret_help : LabelControl;
 	  public var profile_turret : TextInput;
+	  public var profile_turret_from_selector: SoundButtonEx;
+	  public var profile_turret_style: DropdownMenu;
 	  public var profile_gun_help : LabelControl;
 	  public var profile_gun : TextInput;
+	  public var profile_gun_from_selector: SoundButtonEx;
+	  public var profile_gun_style: DropdownMenu;
 	  
 	  // vehicle selector
 	  public var help_vehicle_selector : LabelControl;
@@ -119,6 +128,7 @@ package uml
 	  protected var list_ignore_profiles : Array;
 	  protected var list_profile_objects : Array;
 	  protected var list_styles : Array = null;
+	  protected var list_hybrid_parts_styles : Array = [new Array(), new Array(), new Array()];
 	  protected var customization_data : Object;
 	  protected var forced_customization : Array = null;
 	  
@@ -176,6 +186,8 @@ package uml
 		 this.setStringConfigToAS();
 	  }
 	  
+	  
+	  
 	  internal function createProfileList(x: Number, y: Number) : Object {
 		// try to create a profile list
 		var currentX : Number = x;
@@ -198,14 +210,15 @@ package uml
 			//this.profile_selector.dataProvider.invalidate();
 			this.current_profile_name = createTextInput("profile_placeholder", 35, 102);
 			this.current_profile_name.editable = false;
-			this.current_profile_name.width = 280;
+			this.current_profile_name.width = 220;
+			this.current_profile_ignore = createCheckbox("Ignore by GUI", 35 + 225, 105);
 			// this.current_profile_name.autoSize = TextFieldAutoSize.LEFT;
 			// this.current_profile_name.toolTip = "The full name of the profile.";
 			this.current_profile_target_help = createLabel("Enabled profiles:", 35 + 125, 105 + 20);
 			this.current_profile_target = createTextInput("whitelist_placeholder", 35 + 225, 105 + 20 - 3);
 			this.current_profile_enable = createCheckbox("Enabled", 35, 105 + 20);
 			this.current_profile_swapNPC = createCheckbox("Model swap NPC", 35, 105 + 40);
-			this.current_profile_ignore = createCheckbox("Ignore by GUI", 35, 105 + 60);
+			this.current_profile_alignToTurret = createCheckbox("Align to Turret", 35, 105 + 60);
 
 			this.current_profile_camo_help = createLabel("Camouflage ID:", 35 + 125, 105 + 40);
 			this.current_profile_camo = createDropdown(35 + 225, 105 + 40 - 3);
@@ -216,10 +229,11 @@ package uml
 
 			this.current_profile_configString_help = createLabel("Config:", 35, 105 + 80)
 			this.current_profile_configString = createTextInput("N/A", 35 + 50, 105 + 80 - 3);
-			this.current_profile_configString.width = 60;
-			this.current_profile_configString.enabled = false;
-			this.current_profile_style_help = createLabel("Style:", 35 + 125, 105 + 80);
-			this.current_profile_style = createDropdown(35 + 225, 102 + 80);
+			this.current_profile_configString.width = 60; this.current_profile_configString.maxChars = 4;
+			this.current_profile_style_help = createLabel("(Progress) Style:", 35 + 125, 105 + 80);
+			this.current_profile_style_progression = createTextInput("4", 35 + 225, 105 + 80 - 3);
+			this.current_profile_style_progression.width = 30; this.current_profile_style_progression.maxChars = 1; this.current_profile_style_progression.enabled = false;
+			this.current_profile_style = createDropdown(35 + 225 + 35, 105 + 80 - 3);
 			this.use_hangar_vehicle = createButton("Add hangar vehicle to Whitelist", 35 + 20, 105 + 105, true);
 			this.delete_profile = createButton("Delete this Profile", 35 + 230, 105 + 105, true);
 			this.populatePaintCamo();
@@ -227,12 +241,19 @@ package uml
 			this.hybrid_help = createLabel("Hybrid Vehicle Configuration", 35, 235)
 			this.profile_chassis_help = createLabel("Chassis:", 35, 235 + 20);
 			this.profile_chassis = createTextInput("N/A", 35 + 50, 235 + 20 - 3);
-			this.profile_hull_help = createLabel("Hull:", 35 + 185, 235 + 20);
-			this.profile_hull = createTextInput("N/A", 35 + 185 + 35, 235 + 20 - 3);
-			this.profile_turret_help = createLabel("Turret:", 35, 235 + 40);
-			this.profile_turret = createTextInput("N/A", 35 + 50, 235 + 40 - 3);
-			this.profile_gun_help = createLabel("Gun:", 35 + 185, 235 + 40);
-			this.profile_gun = createTextInput("N/A", 35 + 185 + 35, 235 + 40 - 3);
+			this.profile_chassis_style = createDropdown(35, 235 + 40 - 3); this.profile_chassis_style.width = 120;
+			this.profile_hull_help = createLabel("Hull:", 35 + 215, 235 + 20);
+			this.profile_hull = createTextInput("N/A", 35 + 215 + 35, 235 + 20 - 3);
+			this.profile_hull_style = createDropdown(35 + 215, 235 + 40 - 3); this.profile_hull_style.width = 120;
+			this.profile_hull_from_selector = createButton("From Selector", 35 + 215 + 120, 235 + 40, true);
+			this.profile_turret_help = createLabel("Turret:", 35, 235 + 60);
+			this.profile_turret = createTextInput("N/A", 35 + 50, 235 + 60 - 3);
+			this.profile_turret_style = createDropdown(35, 235 + 80 - 3); this.profile_turret_style.width = 120;
+			this.profile_turret_from_selector = createButton("From Selector", 35 + 120, 235 + 80, true);
+			this.profile_gun_help = createLabel("Gun:", 35 + 215, 235 + 60);
+			this.profile_gun = createTextInput("N/A", 35 + 215 + 35, 235 + 60 - 3);
+			this.profile_gun_style = createDropdown(35 + 215, 235 + 80 - 3); this.profile_gun_style.width = 120;
+			this.profile_gun_from_selector = createButton("From Selector", 35 + 215 + 120, 235 + 80, true);
 			this.profile_chassis.enabled = false;
 
 			// adding appropriate listeners
@@ -244,11 +265,13 @@ package uml
 
 			this.current_profile_enable.addEventListener(ButtonEvent.CLICK, this.onSetEnableProfile);
 			this.current_profile_swapNPC.addEventListener(ButtonEvent.CLICK, this.onSetEnableProfileForNPC);
+			this.current_profile_alignToTurret.addEventListener(ButtonEvent.CLICK, this.onSetAlignToTurret);
 			this.current_profile_ignore.addEventListener(ButtonEvent.CLICK, this.onIgnoreChange);
 			this.current_profile_target.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onWhitelistChange);
 			this.current_profile_camo.addEventListener(ListEvent.INDEX_CHANGE, this.onCamoChange);
 			this.current_profile_paint.addEventListener(ListEvent.INDEX_CHANGE, this.onPaintChange);
 			this.current_profile_style.addEventListener(ListEvent.INDEX_CHANGE, this.onStyleChange);
+			this.current_profile_style_progression.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onProgressionChange);
 			this.current_profile_configString.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onConfigStringChange);
 			this.delete_profile.addEventListener(ButtonEvent.CLICK, this.removeProfile);
 			this.use_hangar_vehicle.addEventListener(ButtonEvent.CLICK, this.addHangarVehicleToWhitelist);
@@ -256,9 +279,16 @@ package uml
 			this.profile_hull.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.updateHybridParts);
 			this.profile_turret.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.updateHybridParts);
 			this.profile_gun.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.updateHybridParts);
+			this.profile_hull_from_selector.addEventListener(ButtonEvent.CLICK, this.updateHybridParts);
+			this.profile_turret_from_selector.addEventListener(ButtonEvent.CLICK, this.updateHybridParts);
+			this.profile_gun_from_selector.addEventListener(ButtonEvent.CLICK, this.updateHybridParts);
+			this.profile_chassis_style.addEventListener(ListEvent.INDEX_CHANGE, this.onStyleChange);
+			this.profile_hull_style.addEventListener(ListEvent.INDEX_CHANGE, this.onStyleChange);
+			this.profile_turret_style.addEventListener(ListEvent.INDEX_CHANGE, this.onStyleChange);
+			this.profile_gun_style.addEventListener(ListEvent.INDEX_CHANGE, this.onStyleChange);
 			// 
 			currentX = 35 + 425 // 460
-			currentY = 310
+			currentY = 350
 			
 			// adding the concerning VehicleSelector panel
 			currentX = this.createVehicleSelector(currentX, 65);
@@ -396,10 +426,12 @@ package uml
 			this.profile_selector.removeEventListener(ListEvent.INDEX_CHANGE, this.loadProfileAtCurrentIndex);
 			
 			this.current_profile_enable.removeEventListener(ButtonEvent.CLICK, this.onSetEnableProfile);
+			this.current_profile_alignToTurret.removeEventListener(ButtonEvent.CLICK, this.onSetAlignToTurret);
 			this.current_profile_ignore.removeEventListener(ButtonEvent.CLICK, this.onIgnoreChange);
 		    this.current_profile_target.removeEventListener(ListEvent.INDEX_CHANGE, this.onWhitelistChange);
 		    this.current_profile_camo.removeEventListener(ListEvent.INDEX_CHANGE, this.onCamoChange);
 		    this.current_profile_paint.removeEventListener(ListEvent.INDEX_CHANGE, this.onPaintChange);
+			this.current_profile_style_progression.removeEventListener(FocusHandlerEvent.FOCUS_OUT, this.onProgressionChange);
 			
 			this.vehicle_nations.removeEventListener(ListEvent.INDEX_CHANGE, this.loadVehiclesWithCriteriaToAS);
 			this.vehicle_type.removeEventListener(ListEvent.INDEX_CHANGE, this.loadVehiclesWithCriteriaToAS);
@@ -411,6 +443,13 @@ package uml
 			this.profile_hull.removeEventListener(FocusHandlerEvent.FOCUS_OUT, this.updateHybridParts);
 			this.profile_turret.removeEventListener(FocusHandlerEvent.FOCUS_OUT, this.updateHybridParts);
 			this.profile_gun.removeEventListener(FocusHandlerEvent.FOCUS_OUT, this.updateHybridParts);
+			this.profile_hull_from_selector.removeEventListener(ButtonEvent.CLICK, this.updateHybridParts);
+			this.profile_turret_from_selector.removeEventListener(ButtonEvent.CLICK, this.updateHybridParts);
+			this.profile_gun_from_selector.removeEventListener(ButtonEvent.CLICK, this.updateHybridParts);
+			this.profile_chassis_style.removeEventListener(ListEvent.INDEX_CHANGE, this.onStyleChange);
+			this.profile_hull_style.removeEventListener(ListEvent.INDEX_CHANGE, this.onStyleChange);
+			this.profile_turret_style.removeEventListener(ListEvent.INDEX_CHANGE, this.onStyleChange);
+			this.profile_gun_style.removeEventListener(ListEvent.INDEX_CHANGE, this.onStyleChange);
 			
 			if(this.getIsDebugUMLFromPy()) {
 				this.debug_btn.removeEventListener(ButtonEvent.CLICK, this.sendDebugCmdFromAS);
@@ -447,6 +486,34 @@ package uml
 			this.profile_selector.selectedIndex --; 
 	  }
 	  
+	  internal function toggleAvailabilityHybrid(enable : Boolean, profile_obj : Object = null) : void {
+		// set enable/disable hybrid availability. Split to a function due to styleSet conflicting with hybrids.
+		if(profile_obj == null) {
+			profile_obj = this.list_profile_objects[this.profile_selector.selectedIndex];
+			// DebugUtils.LOG_WARNING("[UML GUI][AS] Debug: profile_obj @toggleAvailabilityHybrid is null, recalling correct object using current selector.");
+		}
+		if((enable == this.profile_hull.enabled) && (enable == this.profile_turret.enabled) && (enable == this.profile_gun.enabled) && !enable) {
+			return; // if the values are already correctly set for disabled, do not repeat 
+		}
+		if(enable) {
+			this.updateStyleOption(profile_obj["chassisStyle"], this.profile_chassis_style);
+			this.profile_hull.text = profile_obj["hull"]; this.profile_hull.enabled = true; this.profile_hull_from_selector.enabled = true;
+			this.updateStyleOption(profile_obj["hullStyle"], this.profile_hull_style, profile_obj["hull"]);
+			this.profile_turret.text = profile_obj["turret"]; this.profile_turret.enabled = true; this.profile_turret_from_selector.enabled = true;
+			this.updateStyleOption(profile_obj["turretStyle"], this.profile_turret_style, profile_obj["turret"]);
+			this.profile_gun.text = profile_obj["gun"]; this.profile_gun.enabled = true; this.profile_gun_from_selector.enabled = true;
+			this.updateStyleOption(profile_obj["gunStyle"], this.profile_gun_style, profile_obj["gun"]);
+		} else {
+			this.profile_chassis_style.enabled = false; this.profile_chassis_style.selectedIndex = -1;
+			this.profile_hull.text = "N/A"; this.profile_hull.enabled = false; 
+			this.profile_hull_style.enabled = false; this.profile_hull_style.selectedIndex = -1; this.profile_hull_from_selector.enabled = false;
+			this.profile_turret.text = "N/A"; this.profile_turret.enabled = false;
+			this.profile_turret_style.enabled = false; this.profile_turret_style.selectedIndex = -1; this.profile_turret_from_selector.enabled = false;
+			this.profile_gun.text = "N/A"; this.profile_gun.enabled = false;
+			this.profile_gun_style.enabled = false; this.profile_gun_style.selectedIndex = -1; this.profile_gun_from_selector.enabled = false;
+		}
+	  }
+	  
 	  internal function loadProfileAtCurrentIndex() : void {
 	    var current_idx : Number = this.profile_selector.selectedIndex;
 		// if topmost, disable backward; if at end, disable forward
@@ -454,22 +521,27 @@ package uml
 		this.forward_btn.enabled = current_idx < (this.list_profile_objects.length-1);
 		// load respective data into components
 		var currentProfile : Object = this.list_profile_objects[current_idx];
-		//DebugUtils.LOG_WARNING("loadProfileAtCurrentIndex called for obj:" + String(currentProfile) + " at index " + String(current_idx));
+		//DebugUtils.LOG_WARNING("[UML GUI][AS] loadProfileAtCurrentIndex called for obj:" + App.utils.JSON.encode(currentProfile) + " at index " + String(current_idx));
 		if("parent" in currentProfile) {
-			// custom name and section
 			this.current_profile_name.text = "[" + currentProfile["parent"] + "]" + currentProfile["name"];
-			this.profile_hull.text = currentProfile["hull"]; this.profile_hull.enabled = true;
-			this.profile_turret.text = currentProfile["turret"]; this.profile_turret.enabled = true;
-			this.profile_gun.text = currentProfile["gun"]; this.profile_gun.enabled = true;
+			// custom name and section ONLY WHEN parents are not bound with their 3D styles
 		} else {
 			this.current_profile_name.text = currentProfile["name"];
-			this.profile_hull.text = "N/A"; this.profile_hull.enabled = false;
-			this.profile_turret.text = "N/A"; this.profile_turret.enabled = false;
-			this.profile_gun.text = "N/A"; this.profile_gun.enabled = false;
+			// this.toggleAvailabilityHybrid(false, currentProfile);
 		}
+		this.updateStyleOption(currentProfile["styleSet"], this.current_profile_style);
+		if(this.list_styles == null) { // update viability of the progression TextInput
+			this.current_profile_style_progression.enabled = false;
+			this.current_profile_style_progression.text = "";
+		} else {
+			this.current_profile_style_progression.enabled = true;
+			this.current_profile_style_progression.text = currentProfile["styleProgression"];
+		}
+		this.toggleAvailabilityHybrid(("parent" in currentProfile) && (this.current_profile_style.selectedIndex <= 0), currentProfile);
 		this.current_profile_enable.selected = currentProfile["enabled"];
 		this.current_profile_swapNPC.selected = currentProfile["swapNPC"];
 		this.current_profile_ignore.selected = (this.list_ignore_profiles.indexOf(currentProfile["name"]) >= 0);
+		this.current_profile_alignToTurret.selected = currentProfile["alignToTurret"];
 		if(currentProfile["useWhitelist"]) {
 			this.current_profile_target.text = currentProfile["whitelist"];
 		} else {
@@ -477,7 +549,6 @@ package uml
 		}
 		this.current_profile_camo.selectedIndex = this.customization_data["camoID"].indexOf(currentProfile["camouflageID"]);
 		this.current_profile_paint.selectedIndex = this.customization_data["paintID"].indexOf(currentProfile["paintID"]);
-		this.updateStyleOptionInAS(currentProfile["styleSet"], currentProfile["name"]);
 		if("configString" in currentProfile) {
 			this.current_profile_configString.enabled = true;
 			this.current_profile_configString.text = currentProfile["configString"];
@@ -493,6 +564,10 @@ package uml
 	  
 	  internal function onSetEnableProfileForNPC() : void {
 		this.list_profile_objects[this.profile_selector.selectedIndex]["swapNPC"] = this.current_profile_swapNPC.selected;
+	  }
+	  
+	  internal function onSetAlignToTurret() : void {
+		this.list_profile_objects[this.profile_selector.selectedIndex]["alignToTurret"] = this.current_profile_alignToTurret.selected;
 	  }
 	  
 	  internal function onIgnoreChange() : void {
@@ -514,7 +589,13 @@ package uml
 		// also update the new profile
 		if(!this.toggle_show_ignore.selected) {
 			this.reloadProfileSelector(null, true);
+			/*if(this.profile_selector.selectedIndex >= this.list_profile_objects.length)
+				this.profile_selector.selectedIndex = 0; // if ignore the last entry, circle to first. TODO go to new last?*/
 		}
+	  }
+	  
+	  internal function onProgressionChange() : void {
+		this.list_profile_objects[this.profile_selector.selectedIndex]["styleProgression"] = this.current_profile_style_progression.text;
 	  }
 	  
 	  internal function onWhitelistChange() : void {
@@ -546,14 +627,50 @@ package uml
 		this.list_profile_objects[this.profile_selector.selectedIndex]["paintID"] = this.customization_data["paintID"][this.current_profile_paint.selectedIndex];
 	  }
 	  
-	  internal function onStyleChange() : void {
-		if(this.current_profile_style.selectedIndex < 0) {
+	  internal function onStyleChange(event : Object, actual_target : DropdownMenu = null) : void {
+		var current_profile : Object = this.list_profile_objects[this.profile_selector.selectedIndex];
+		var style_selector_object : DropdownMenu = (actual_target ? actual_target : event.target) as DropdownMenu;
+		var property_name : String;
+		var list_styles : Array;
+		switch(style_selector_object) {
+			case this.current_profile_style:
+				property_name = "styleSet"
+				list_styles = this.list_styles;
+				break;
+			case this.profile_chassis_style:
+				property_name = "chassisStyle"
+				list_styles = this.list_styles;
+				break;
+			case this.profile_hull_style:
+				property_name = "hullStyle"
+				list_styles = this.list_hybrid_parts_styles[0];
+				break;
+			case this.profile_turret_style:
+				property_name = "turretStyle"
+				list_styles = this.list_hybrid_parts_styles[1];
+				break;
+			case this.profile_gun_style:
+				property_name = "gunStyle"
+				list_styles = this.list_hybrid_parts_styles[2];
+				break;
+			default:
+				// should not happen; TODO log the needed info to debug
+				return
+		}
+		if(style_selector_object.selectedIndex < 0) {
 			// disabled from above for some reason; ignore
 			return
-		} else if(this.current_profile_style.selectedIndex == 0) {
-			this.list_profile_objects[this.profile_selector.selectedIndex]["styleSet"] = "0";
 		} else {
-			this.list_profile_objects[this.profile_selector.selectedIndex]["styleSet"] = this.list_styles[this.current_profile_style.selectedIndex];
+			if(style_selector_object.selectedIndex == 0) {
+				current_profile[property_name] = "0";
+			} else {
+				current_profile[property_name] = list_styles[style_selector_object.selectedIndex];
+			}
+			// DebugUtils.LOG_WARNING("[UML GUI][AS] Debug: Updated property [" + property_name + "] of existing profile [" + current_profile["name"] + "(" + App.utils.JSON.encode(current_profile) + ")" + "] with index " + String(style_selector_object.selectedIndex));
+		}
+		if(style_selector_object == this.current_profile_style) {
+			// selecting a 3D style (!=0) will disable hybrid vehicles
+			this.toggleAvailabilityHybrid(this.current_profile_style.selectedIndex == 0);
 		}
 	  }
 	  
@@ -576,7 +693,7 @@ package uml
 		}
 	  }
 	  
-	  internal function addNewProfile(event: Object) : void {
+	  internal function addNewProfile(event: Event) : void {
 		var profile_text: String;
 		var new_profile : Object;
 		if(event.target == this.add_profile_as_parent_btn) { // add a parent profile
@@ -589,7 +706,7 @@ package uml
 		}
 	
 		var profile_index_if_exist : Number = -1;
-		for(var i:Number = 0; i < 0; i++) if(this.list_profile_objects[i]["name"] == profile_text) { profile_index_if_exist = i; break; }
+		for(var i:Number = 0; i < this.list_profile_objects.length; i++) if(this.list_profile_objects[i]["name"] == profile_text) { profile_index_if_exist = i; break; }
 		
 		if(profile_index_if_exist >= 0) {// if already exist, jump to profile instead of creating new
 			this.profile_selector.selectedIndex = profile_index_if_exist;
@@ -602,10 +719,18 @@ package uml
 	  
 	  internal function removeProfile() : void {
 		var remove_index : Number = this.profile_selector.selectedIndex;
+		var remove_profile_name : String = this.list_profile_objects[remove_index]["name"];
+		var true_remove_index : Number = -1;
+		for(var i:Number = 0; i < this.list_all_profile_objects.length; i++) if(this.list_all_profile_objects[i]["name"] == remove_profile_name) { true_remove_index = i; break; }
 		// remove on Py side
-		this.removeProfileAtPy( this.list_profile_objects[remove_index]["name"] );
+		this.removeProfileAtPy( remove_profile_name );
 		// remove on AS side 
-		this.list_profile_objects.splice(remove_index, 1);
+		if(true_remove_index < 0) {
+			DebugUtils.LOG_WARNING("[UML GUI][AS] Issue: the list_all_profile_objects do not contain profile with name " + remove_profile_name + ". Skipping deletion.");
+		} else {
+			DebugUtils.LOG_WARNING("[UML GUI][AS] Debug: targetting " + remove_profile_name + " in-field index [" + String(remove_index) + "] true index [" + String(true_remove_index) + "].");
+			this.list_all_profile_objects.splice(true_remove_index, 1);
+		}
 		// DebugUtils.LOG_WARNING("[UML GUI] debug selected index"
 		if(remove_index >= this.profile_selector.dataProvider.length - 1) { // if the removed index is last, reset to first. TODO Maybe reset to last instead?
 			this.profile_selector.selectedIndex = 0;
@@ -613,7 +738,7 @@ package uml
 		this.reloadProfileSelector(null, true);
 	  }
 	  
-	  internal function addProfileToWhitelist(event: Object, profile_text: String = null) : void {
+	  internal function addProfileToWhitelist(event: Event, profile_text: String = null) : void {
 		// on clicking a vehicle within vehicle_selector, change the corresponding TextInput to the profile name
 		if(profile_text == null) {
 			profile_text = this.vehicle_profile_field.text;
@@ -633,7 +758,7 @@ package uml
 		this.addProfileToWhitelist(null, this.getHangarVehicleFromPy());
 	  }
 	  
-	  internal function updateStyleOptionInAS(style_index_or_name : String, profile_name : String = null) : void {
+	  internal function updateStyleOption(style_index_or_name : String, target_dropdown : DropdownMenu, profile_name : String = null) : void {
 	    if( profile_name == null ) { 
 			profile_name = this.current_profile_name.text;
 			if(profile_name.indexOf("[") >= 0) {
@@ -643,23 +768,44 @@ package uml
 			// profile_name = ("parent" in targeted_profile) ? targeted_profile["parent"] : targeted_profile["name"] ; // always get parent if available
 		}
 		//DebugUtils.LOG_WARNING("debug: profile_name: " + profile_name);
-		this.list_styles = this.getPossibleStyleOfProfileFromPy(profile_name);
+		var list_styles : Array = this.getPossibleStyleOfProfileFromPy(profile_name);
 		// attempt to parse to number; if not true, try to search in list of possible styles; if not found there either, safeguard to 0 (No style)
 		// attempt to convert 
-		if(this.list_styles == null) {
+		// update corresponding styles: list_styles for current_profile_style and list_hybrid_parts_styles for others
+		switch(target_dropdown) {
+			case this.current_profile_style:
+			case this.profile_chassis_style:
+				this.list_styles = list_styles;
+				break;
+			case this.profile_hull_style:
+				this.list_hybrid_parts_styles[0] = list_styles;
+				break;
+			case this.profile_turret_style:
+				this.list_hybrid_parts_styles[1] = list_styles;
+				break;
+			case this.profile_gun_style:
+				this.list_hybrid_parts_styles[2] = list_styles;
+				break;
+		}
+		var selector_name : String =  (this.current_profile_style == target_dropdown || this.profile_hull_style == target_dropdown) ? ((this.current_profile_style == target_dropdown) ? "all" : "hull") : ((this.profile_gun_style == target_dropdown) ? "gun" : "turret") ;
+		if(list_styles == null) {
 			// no style, disable the selector
-			this.current_profile_style.enabled = false;
-			this.current_profile_style.selectedIndex = -1;
+			// DebugUtils.LOG_WARNING("[UML GUI][AS] Debug: Style dropdown disabled for " + profile_name + "[" + selector_name + "]");
+			target_dropdown.enabled = false;
+			target_dropdown.selectedIndex = -1;
 		} else {
 			// possible style, update the selector
 			var profile_idx : Number = Number(style_index_or_name);
 			if(isNaN(profile_idx)) {
-				profile_idx = this.list_styles.indexOf(style_index_or_name);
+				profile_idx = list_styles.indexOf(style_index_or_name);
 				if(profile_idx == -1) profile_idx = 0;
 			}
-			this.current_profile_style.enabled = true;
-			this.current_profile_style.dataProvider = new DataProvider(this.list_styles);
-			this.current_profile_style.selectedIndex = profile_idx;
+			target_dropdown.enabled = true;
+			// DebugUtils.LOG_WARNING("[UML GUI][AS] Debug: Style dropdown enabled for " + profile_name + "[" + selector_name + "] with following params: list styles: " + String(list_styles) + "; current style value " + String(style_index_or_name) + "; found index " + String(profile_idx));
+			// target_dropdown.selectedIndex = -1; // try disabling the data beforehand
+			target_dropdown.dataProvider = new DataProvider(list_styles);
+			target_dropdown.invalidateData();
+			target_dropdown.selectedIndex = profile_idx;
 		}
 	  }
 	  
@@ -690,20 +836,20 @@ package uml
 					this.list_profile_objects.push(o)
 				}
 			}
-			DebugUtils.LOG_WARNING("[UML GUI][AS] Debug: entering filtered profile @reloadProfileSelector, full count - non-ignore count: " + String(this.list_all_profile_objects.length) + " - " + String(this.list_profile_objects.length));
+			// DebugUtils.LOG_WARNING("[UML GUI][AS] Debug: entering filtered profile @reloadProfileSelector, full count - non-ignore count: " + String(this.list_all_profile_objects.length) + " - " + String(this.list_profile_objects.length));
 		}
 		var profile_names : Array = []
 		for(var i:int=0; i<this.list_profile_objects.length; i++) { 
 			profile_names[i] = this.list_profile_objects[i]["name"]; 
 		}
 		this.profile_selector.dataProvider = new DataProvider(profile_names);
-		this.profile_selector.invalidateData();
 		if(reload_current_profile) {
 			// validate and update index (if too large, snap to first profile)
-			if(this.profile_selector.selectedIndex > this.list_profile_objects.length)
+			if(this.profile_selector.selectedIndex >= this.list_profile_objects.length)
 				this.profile_selector.selectedIndex = 0;
 			this.loadProfileAtCurrentIndex();
 		}
+		this.profile_selector.invalidateData();
 	  }
 	  
 	  public function setStringConfigToAS() : void { // paired with getStringConfig
@@ -717,7 +863,7 @@ package uml
 		  if(this.isStatic) {
 			  this.list_all_profile_objects = dict["listProfileObjects"];
 			  this.list_ignore_profiles = dict["ignoreList"];
-			  DebugUtils.LOG_WARNING("[UML GUI][AS] Debug: ignoreList: " + String(this.list_ignore_profiles));
+			  // DebugUtils.LOG_WARNING("[UML GUI][AS] Debug: ignoreList: " + String(this.list_ignore_profiles));
 			  this.reloadProfileSelector(null, false);
 			  this.profile_selector.selectedIndex = dict['lastProfileSelectedIdx'] < this.list_profile_objects.length ? dict['lastProfileSelectedIdx'] : 0; // prevent delete & no applying
 			  this.loadProfileAtCurrentIndex();
@@ -789,15 +935,38 @@ package uml
 	  public function updateHybridParts(e : Event) : void {
 		var targeted_profile : Object = this.list_profile_objects[this.profile_selector.selectedIndex];
 		var targeted_field : String;
-		switch(e.target) { // retrieve corresponding fields
+		var target_obj : Object = e.target;
+		var target_style_obj : DropdownMenu;
+		switch(target_obj) { // retrieve corresponding fields
 			case this.profile_hull:
 				targeted_field = "hull";
+				target_style_obj = this.profile_hull_style;
 				break;
 			case this.profile_turret:
 				targeted_field = "turret";
+				target_style_obj = this.profile_turret_style;
 				break;
 			case this.profile_gun:
 				targeted_field = "gun";
+				target_style_obj = this.profile_gun_style;
+				break;
+			case this.profile_hull_from_selector:
+				target_obj = this.profile_hull;
+				this.profile_hull.text = this.vehicle_profile_field.text;
+				targeted_field = "hull";
+				target_style_obj = this.profile_hull_style;
+				break;
+			case this.profile_turret_from_selector:
+				target_obj = this.profile_turret;
+				this.profile_turret.text = this.vehicle_profile_field.text;
+				targeted_field = "turret";
+				target_style_obj = this.profile_turret_style;
+				break;
+			case this.profile_gun_from_selector:
+				target_obj = this.profile_gun;
+				this.profile_gun.text = this.vehicle_profile_field.text;
+				targeted_field = "gun";
+				target_style_obj = this.profile_gun_style;
 				break;
 			default: // some weird call here? TODO add debugging options.
 				return;
@@ -808,13 +977,15 @@ package uml
 					"] not exist in targeted_profile [" + App.utils.JSON.encode(targeted_profile) + "] Check if there is some failed logic.");
 			return
 		}
-		if(this.checkIsValidWoTVehicleAtPy(e.target.text)) {
-			// is valid, exchange
-			targeted_profile[targeted_field] = e.target.text;
+		if(this.checkIsValidWoTVehicleAtPy(target_obj.text)) {
+			// is valid, exchange and reload the style with default value (0)
+			targeted_profile[targeted_field] = target_obj.text;
+			this.updateStyleOption("0", target_style_obj, target_obj.text);
 		} else {
-			// is invalid, load the last value up
-			e.target.text = targeted_profile[targeted_field]
+			// is invalid, load the last value up and do not reload
+			target_obj.text = targeted_profile[targeted_field]
 		}
+		// this.onStyleChange(null, target_style_obj);
 	  }
 	  
 	  public function sendDebugCmdFromAS() : void {

@@ -7,7 +7,7 @@
 - Crash upon F5/Entering with no log
  Possible missing hardpoint (HP). Check HP_gunJoint in turret, etc.
  
-- Blank camo on turret/hull/etc.
+- Monotone or blank camo on turret/hull/etc.
 Issue caused by texture larger than camo appliance size (aoTextureSize field); resize it to correct level. 
  
 - Editing UV mapping using .ms script: 
@@ -16,6 +16,11 @@ After scaling, resize corresponding dds (AM, AMM, AO, GMM) to the ratio you want
 - Weird shade?
 Currently fixed by removing normal map. See below for possible fix
 https://www.youtube.com/watch?v=GBnMEXhHtxg
+Face normal invertion: 
+- Select gun object -> Editable Mesh, Yes -> use Selction, Face -> Ctrl+A to select all -> Surface Properties, Flip
+- Select gun object -> Modifier List, Normal -> uncheck Flip Normal -> Collapse To
+Vertex normal invertion:
+Tools -> Mirror
 
 - Animate antenna:
  + Create two bones @ root and tip (Create -> System -> Bones IK chain). Can create multiple bones, but should only assign those two to the mesh
@@ -31,10 +36,6 @@ https://www.youtube.com/watch?v=GBnMEXhHtxg
  + Retrieve orientation and location of it (the currently selected Working Pivot) using `quatToEuler2 $.transform.rotation` and `$.pos`
  + Select the object, set to Affect Pivot only, and copy these params down on the object Pivot
 
-Forced customization:
-C:\Python27\python.exe -m compileall mod_replaceOwnCustomization.py
-Additionally, to pack into independent .wotmod
-py pyc_to_wotmod.py mod_replaceOwnCustomization.pyc
  
 Making SWF GUI:
 Compile the python binding with compileall
@@ -51,6 +52,12 @@ java -jar "%FLEX_HOME%\lib\mxmlc.jar" +flexlib="%FLEX_HOME%/frameworks" %*
 """
 
 Those swc can also be viewed using JPEXS Free Flash Decompiler
+
+Forced customization:
+C:\Python27\python.exe -m compileall py\mod_replaceOwnCustomization.py
+D:\Archive\flex_sdk_4.6.0.23201B\bin\mxmlc  -compiler.source-path=as3 -compiler.external-library-path+=as3\lib\common-1.0-SNAPSHOT.swc,as3\lib\gui_base-1.0-SNAPSHOT.swc -static-link-runtime-shared-libraries=true -o as3\ROC_GUI.swf as3\uml\ReplaceOwnCustomizationGUI.as
+Additionally, to pack into independent .wotmod (not updated)
+py pyc_to_wotmod.py py\mod_replaceOwnCustomization.py as3\ROC_GUI.swf ReplaceOwnCustomization.wotmod
 
 Binding between swf and python classes are achieved with:
 g_entitiesFactories.addSettings(ViewSettings("UML_MainGUI", UML_MainGUI, 'UML_MainGUI.swf',
@@ -91,5 +98,8 @@ Vietnam sticker: 410 is flag, 38 is armored flag
 Prefered camos:
 513, 512, 514 (large spots); 555, 554, 556 (7th aniv); 634, 635, 636 (Expeditionary)
 	Summer independent: 638 (Homeland), 660 (1st Guard), 576 (Fire Bulge), 
-	Winter independent: 635 (Glass), 623 (Alfa), 622 (Btl Moscow), 598 (Hunt Silver), 560 (Western Front), 387 (Black Marble)
+	Winter independent: 635 (Glass), 623 (Alfa), 622 (Btl Moscow), 598 (Hunt Silver), 560 (Western Front), 387 (Black Marble), 302 (Polar Bear)
 	Desert independent: 618 (Thanksgiving), 553 (Four tone floral), 299 (Lancelot)
+	
+	
+Powerpoint Mac PList: Library\Preferences\com.microsoft.Powerpoint.plist

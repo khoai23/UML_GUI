@@ -80,7 +80,7 @@ package uml
 		
 		protected function loadCustomizationDictAtAS(e : Event, reload : Boolean = false) : void { // both load and reload
 			var dataFromPy : String = this.getCustomizationDictFromPy(reload || e.target == this.reload_from_disk_button);
-			DebugUtils.LOG_WARNING("[ROC][AS] Debug: loaded data from Python :" + dataFromPy);
+			DebugUtils.LOG_WARNING("[ROC][AS] Debug: loaded data from Python:" + dataFromPy + " (reload " + String(reload || e.target == this.reload_from_disk_button) + ")");
 			var customizationDict : Object = App.utils.JSON.decode(dataFromPy);
 			this.forced_customization = [customizationDict["player"], customizationDict["ally"], customizationDict["enemy"]];
 		}
@@ -97,27 +97,27 @@ package uml
 			//							first_emblem, second_emblem; camo set of 3; paint set of 3
 			var help_forced_customization : LabelControl = createLabel("Force Customization", x, y);
 			this.affect_hangar = createCheckbox("Affect Hangar", x + 125, y);
-			this.target_customization = createDropdown(x + 125 + 130, y - 2);
+			this.target_customization = createDropdown(x + 125 + 130, y - 3);
 			var emblem_help : LabelControl = createLabel("Emblems: ", x, y + 25);
-			this.first_emblem = createDropdown(x + 95, y + 25 - 2);
-			this.second_emblem = createDropdown(x + 95 + 130, y + 25 - 2);
+			this.first_emblem = createDropdown(x + 95, y + 25 - 3);
+			this.second_emblem = createDropdown(x + 95 + 130, y + 25 - 3);
 			this.force_both_emblem = createCheckbox("Force both emblems", x + 95 + 260, y + 25);
 			var camo_help : LabelControl = createLabel("Camo (S-W-D): ", x, y + 50);
-			this.summer_camo = createDropdown(x + 95, y + 50 - 2);
-			this.winter_camo = createDropdown(x + 95 + 130, y + 50 - 2);
-			this.desert_camo = createDropdown(x + 95 + 260, y + 50 - 2);
+			this.summer_camo = createDropdown(x + 95, y + 50 - 3);
+			this.winter_camo = createDropdown(x + 95 + 130, y + 50 - 3);
+			this.desert_camo = createDropdown(x + 95 + 260, y + 50 - 3);
 			var paint_help : LabelControl = createLabel("Paint (S-W-D): ", x, y + 75);
-			this.summer_paint = createDropdown(x + 95, y + 75 - 2);
-			this.winter_paint = createDropdown(x + 95 + 130 , y + 75 - 2);
-			this.desert_paint = createDropdown(x + 95 + 260, y + 75 - 2);
+			this.summer_paint = createDropdown(x + 95, y + 75 - 3);
+			this.winter_paint = createDropdown(x + 95 + 130 , y + 75 - 3);
+			this.desert_paint = createDropdown(x + 95 + 260, y + 75 - 3);
 			// Number list setting: Dropdown for ingame ID + created number
 			var number_help : LabelControl = createLabel("Personal Number: ", x, y + 100);
-			this.pnumber_id = createDropdown(x + 115, y + 100 - 2);
+			this.pnumber_id = createDropdown(x + 115, y + 100 - 3);
 			this.pnumber_id.width = 150;
-			this.pnumber = createTextInput("placeholder_personal_number", x + 115 + 155, y + 100 - 2);
+			this.pnumber = createTextInput("placeholder_personal_number", x + 115 + 155, y + 100 - 3);
 			this.pnumber.width = 70;
 			// Blacklist/Whitelist options
-			this.bwlist_content = createTextInput("placeholder_bwlist", x + 25, y + 125 - 2);
+			this.bwlist_content = createTextInput("placeholder_bwlist", x + 25, y + 125 - 3);
 			this.bwlist_content.width = 150;
 			var bwlist_help : LabelControl = createLabel("As", x + 25 + 155, y + 125);
 			this.bwlist_selector = createDropdown(x + 25 + 155 + 25, y + 125 - 2);
@@ -199,10 +199,6 @@ package uml
 			var pnumber : Number = target_dict["personalNumber"];
 			this.pnumber.text = (pnumber == -999) ? "random" : ((pnumber == -239) ? "hash" : String(pnumber)) ;
 		}
-		
-		internal function updateAffectHangar() : void {
-			this.forced_customization[0]["affectHangar"] = this.affect_hangar.selected;
-		}
 	  
 		internal function updateCustomizationData(e : Event) : void {
 			var target_dict : Object = this.forced_customization[this.target_customization.selectedIndex];
@@ -210,10 +206,13 @@ package uml
 			/*for(var key : String in this.customization_data) {
 				DebugUtils.LOG_WARNING("debug @updateCustomizationData - key [" + key + "]; length " + String(this.customization_data[key].length));
 			}*/
-			if(this.force_both_emblem == e.target) {
-				target_dict["forcedBothEmblem"] = this.force_both_emblem.selected;
+			if(this.affect_hangar == e.target) {
+				this.forced_customization[0]["affectHangar"] = this.affect_hangar.selected;
 			} else {
 				switch(e.target) {
+					case this.force_both_emblem:
+						target_dict["forcedBothEmblem"] = this.force_both_emblem.selected;
+						break;
 					case this.first_emblem:
 						target_dict["forcedEmblem"][0] = this.customization_data["decalID"][this.first_emblem.selectedIndex];
 						break;

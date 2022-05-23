@@ -1,32 +1,34 @@
 package uml
 {
-   import net.wg.infrastructure.base.AbstractWindowView;
-   import flash.utils.Dictionary;
-   import flash.utils.getQualifiedClassName;
-   import flash.events.Event;
-   import flash.text.TextFieldAutoSize;
-   import scaleform.clik.events.ButtonEvent;
-   import scaleform.clik.events.ListEvent;
-   import scaleform.clik.events.FocusHandlerEvent;
-   import scaleform.gfx.TextFieldEx;
-   import scaleform.clik.controls.ScrollingList;
-   //import scaleform.clik.controls.TextInput;
-   import scaleform.clik.core.UIComponent;
-   import scaleform.clik.data.DataProvider;
-   import mx.utils.StringUtil;
+	import net.wg.infrastructure.base.AbstractWindowView;
+	import flash.utils.Dictionary;
+	import flash.utils.getQualifiedClassName;
+	import flash.events.Event;
+	import flash.events.KeyboardEvent;
+	import flash.ui.Keyboard;
+	import flash.text.TextFieldAutoSize;
+	import scaleform.clik.events.ButtonEvent;
+	import scaleform.clik.events.ListEvent;
+	import scaleform.clik.events.FocusHandlerEvent;
+	import scaleform.gfx.TextFieldEx;
+	import scaleform.clik.controls.ScrollingList;
+	//import scaleform.clik.controls.TextInput;
+	import scaleform.clik.core.UIComponent;
+	import scaleform.clik.data.DataProvider;
+	import mx.utils.StringUtil;
 
-   import net.wg.gui.components.controls.CheckBox;
-   import net.wg.gui.components.controls.DropdownMenu;
-   import net.wg.gui.components.controls.TextInput;
+	import net.wg.gui.components.controls.CheckBox;
+	import net.wg.gui.components.controls.DropdownMenu;
+	import net.wg.gui.components.controls.TextInput;
 	import net.wg.gui.components.controls.LabelControl;
-   import net.wg.gui.components.controls.SoundButtonEx;
-   import net.wg.gui.components.controls.ScrollingListPx;
-   import net.wg.gui.components.controls.SoundListItemRenderer;
-   import net.wg.infrastructure.events.ListDataProviderEvent;
-   import net.wg.gui.components.controls.ScrollBar;
+	import net.wg.gui.components.controls.SoundButtonEx;
+	import net.wg.gui.components.controls.ScrollingListPx;
+	import net.wg.gui.components.controls.SoundListItemRenderer;
+	import net.wg.infrastructure.events.ListDataProviderEvent;
+	import net.wg.gui.components.controls.ScrollBar;
 	import net.wg.gui.components.controls.UILoaderAlt;
-   
-   import uml.UML_Profile
+
+	import uml.UML_Profile
 
    
    public class UML_MainGUI extends AbstractWindowView
@@ -34,6 +36,8 @@ package uml
 	  internal var _dateObject: Date = new Date();
 	  
 	  public var moe_selector : DropdownMenu;
+	  public var moe_list : TextInput;
+	  public var moe_nation : DropdownMenu;
 	  public var affect_hangar : CheckBox;
 	  protected var use_UML_sound : CheckBox;
 
@@ -72,6 +76,7 @@ package uml
 	  public var delete_profile : SoundButtonEx;
 	  public var use_hangar_vehicle : SoundButtonEx;
 	  
+	  // hybrid section
 	  public var hybrid_help : LabelControl;
 	  public var profile_chassis_help : LabelControl;
 	  public var profile_chassis : TextInput;
@@ -89,6 +94,22 @@ package uml
 	  public var profile_gun_from_selector: SoundButtonEx;
 	  public var profile_gun_style: DropdownMenu;
 	  
+	  // additional setting section
+	  public var keyboard_dict: Object;
+	  public var remove_unhistorical: CheckBox;
+	  public var remove_clan_logo: CheckBox;
+	  public var force_clan_logo: TextInput;
+	  public var remove_3d_style: CheckBox;
+	  public var swap_friendly_enable: CheckBox;
+	  public var swap_friendly: TextInput;
+	  public var add_profile_friendly: SoundButtonEx;
+	  public var swap_enemy_enable: CheckBox;
+	  public var swap_enemy: TextInput;
+	  public var add_profile_enemy: SoundButtonEx;
+	  public var play_anim_fwd: TextInput;
+	  public var play_anim_bwd: TextInput;
+	  public var play_anim_gun: TextInput;
+	
 	  // vehicle selector
 	  public var help_vehicle_selector : LabelControl;
 	  public var vehicle_nations : DropdownMenu;
@@ -96,29 +117,18 @@ package uml
 	  public var vehicle_tier : DropdownMenu;
 	  public var vehicle_selector : DropdownMenu;
 	  public var vehicle_profile_field : TextInput;
+	  public var vehicle_selector_profiles : Array;
 	// button to add to the profile list or whitelist.
 	  public var add_profile_btn : SoundButtonEx;
 	  public var add_whitelist_btn : SoundButtonEx;
 	  public var profile_with_parent_field : TextInput;
 	  public var add_profile_as_parent_btn : SoundButtonEx;
+	  public var add_profile_to_moe_btn : SoundButtonEx;
 	 
 	  // debug component
 	  public var debug_exec_field : TextInput;
 	  public var debug_eval_field : TextInput;
 	  public var debug_btn : SoundButtonEx;
-	 
-	  // forcedCustomization component
-	  public var help_forced_customization : LabelControl;
-	  public var target_customization : DropdownMenu;
-	  public var first_emblem : DropdownMenu;
-	  public var second_emblem : DropdownMenu;
-	  public var force_both_emblem : CheckBox;
-	  public var summer_camo : DropdownMenu;
-	  public var winter_camo : DropdownMenu;
-	  public var desert_camo : DropdownMenu;
-	  public var summer_paint : DropdownMenu;
-	  public var winter_paint : DropdownMenu;
-	  public var desert_paint : DropdownMenu;
 	  
 	 
 	  // test
@@ -130,7 +140,6 @@ package uml
 	  protected var list_styles : Array = null;
 	  protected var list_hybrid_parts_styles : Array = [new Array(), new Array(), new Array()];
 	  protected var customization_data : Object;
-	  protected var forced_customization : Array = null;
 	  
 	  public var getIsDebugUMLFromPy : Function = null; // this will get UML's debug to decide showing debug fields (eval, exec) or not
 	  public var forcedCustomizationIsAvailableAtPy : Function = null; // this will check if forcedCustomization module exist or not
@@ -145,6 +154,7 @@ package uml
 	  public var getPossibleStyleOfProfileFromPy : Function = null; // this will retrieve the needed profile style from the vehicle obj.
 	  public var debugEvalCommand : Function = null; // eval and exec codes directly from GUI
 	  public var checkIsValidWoTVehicleAtPy : Function = null // check valid code to create hybrids
+	  public var getValidKeyBindFromPy: Function = null // list keybinds that are available on UML.
 
 	  public function UML_MainGUI() {
 		 super();
@@ -153,13 +163,22 @@ package uml
 	  override protected function onPopulate() : void {
 		 super.onPopulate();
 		 
-		 this.moe_selector = createDropdown(35, 10);
+		 this.moe_selector = createDropdown(35, 10 - 3);
 		 this.moe_selector.dataProvider = new DataProvider(["Default MOE", "No MOE", "1 MOE", "2 MOE", "3 MOE"]);
+		 var moe_help_1 : LabelControl = createLabel("applied to: ", 35 + 135, 10);
+		 this.moe_list = createTextInput("moe_list_placeholder", 35 + 195, 10 - 3);
+		 this.add_profile_to_moe_btn = createButton("From Selector", 35 + 330, 10, true);
+		 var moe_help_2 : LabelControl = createLabel("using texture: ", 35 + 330 + 95, 10);
+		 this.moe_nation = createDropdown(35 + 330 + 95 + 85 , 10 - 3);
+		 this.moe_nation.dataProvider = new DataProvider(["Default"]);
+		 this.moe_nation.selectedIndex = 0;
+		 this.moe_nation.enabled = false;
 		 
 		 this.affect_hangar = createCheckbox("View UML in Hangar", 35, 35);
 		 this.use_UML_sound = createCheckbox("Use UML sounds", 200, 35);
 		 
-		this.remodels_filelist_label = createLabel("Base Remodel files:", 325, 35)
+		this.remodels_filelist_label = createLabel("Base Remodel files:", 325, 35);
+		this.remodels_filelist_label.width = 175;
 		this.remodels_filelist = createTextInput("remodel_filelist_placeholder", 430, 30);
 		
 		//var mock_data : DataProvider = new DataProvider([{nation_name: "china", profile_name: "Ch01_Type59"}, {nation_name: "UML", profile_name: "Edweird_T-55A"}]);
@@ -180,16 +199,17 @@ package uml
 		this.apply_button = createButton("Apply", this.width - 200, this.height - 35);
 		this.reload_button = createButton("Reload", this.width - 385, this.height - 35);
 		this.apply_button.addEventListener(ButtonEvent.CLICK, this.sendStringConfigFromAS);
-		this.reload_button.addEventListener(ButtonEvent.CLICK, this.setStringConfigToAS); 
+		this.reload_button.addEventListener(ButtonEvent.CLICK, this.setStringConfigToAS);
+		// bind to MOE button above.
+		this.add_profile_to_moe_btn.addEventListener(ButtonEvent.CLICK, this.addProfileToMOE);
 		 
 		 // update the state after initiation.
 		 this.setStringConfigToAS();
 	  }
 	  
-	  
-	  
 	  internal function createProfileList(x: Number, y: Number) : Object {
 		// try to create a profile list
+		// TODO properly lock the values to currentX and currentY
 		var currentX : Number = x;
 		var currentY : Number = y;
 		if(this.isStatic) {
@@ -287,16 +307,15 @@ package uml
 			this.profile_turret_style.addEventListener(ListEvent.INDEX_CHANGE, this.onStyleChange);
 			this.profile_gun_style.addEventListener(ListEvent.INDEX_CHANGE, this.onStyleChange);
 			// 
-			currentX = 35 + 425 // 460
-			currentY = 350
+			currentX = x + 425; // 460
+			currentY = y + 305; // 350
 			
 			// adding the concerning VehicleSelector panel
-			currentX = this.createVehicleSelector(currentX, 65);
-			
-			// adding forcedCustomization section if the mod is available
-			if(this.forcedCustomizationIsAvailableAtPy()) {
-				currentY = this.createForcedCustomizationSelector(35, currentY);
-			}
+			var altCurrentY : Number = y;
+			altCurrentY = this.createAdditionalSettings(currentX, altCurrentY)
+			var sizeObject : Object = this.createVehicleSelector(currentX, altCurrentY);
+			currentX = sizeObject.x;
+			currentY = (currentY > sizeObject.y) ? currentY : sizeObject.y; // take the longest Y (height)
 		}
 		else {
 			// not working ATM; this version is interactable but do not display
@@ -328,20 +347,20 @@ package uml
 		this.current_profile_paint.selectedIndex = 1;
 	  }
 	  
-	  internal function createVehicleSelector(x: Number, y: Number) : Number {
+	  internal function createVehicleSelector(x: Number, y: Number) : Object {
 		// multiple dropdown list concerning nation-class-tier-vehicle to show the corresponding profile name
 		this.help_vehicle_selector = createLabel("Vehicle Selector", x, y);
-		this.vehicle_nations = createDropdown(x, y + 25);
-		this.vehicle_type = createDropdown(x + 135, y + 25);
-		this.vehicle_tier = createDropdown(x, y + 50);
-		this.vehicle_selector = createDropdown(x + 135, y + 50);
-		this.vehicle_profile_field = createTextInput("vehicle_profile_name", x + 60, y + 75);
+		this.vehicle_nations = createDropdown(x, y + 20);
+		this.vehicle_type = createDropdown(x + 135, y + 20);
+		this.vehicle_tier = createDropdown(x, y + 45);
+		this.vehicle_selector = createDropdown(x + 135, y + 45);
+		this.vehicle_profile_field = createTextInput("vehicle_profile_name", x + 60, y + 70);
 		// button to add to the profile list or whitelist.
-		this.add_profile_btn = createButton("Add as new Profile", x + 15, y + 100, true);
-		this.add_whitelist_btn = createButton("Add to Whitelist", x + 15 + 135, y + 100, true);
+		this.add_profile_btn = createButton("Add as new Profile", x + 15, y + 95, true);
+		this.add_whitelist_btn = createButton("Add to Whitelist", x + 15 + 135, y + 95, true);
 		// button to add as a new profile
-		this.add_profile_as_parent_btn = createButton("Add as Parent to ", x + 20, y + 125, true);
-		this.profile_with_parent_field = createTextInput("profile_with_parent_placeholder", x + 135, y + 125 - 2);
+		this.add_profile_as_parent_btn = createButton("Add as Parent to ", x + 20, y + 120, true);
+		this.profile_with_parent_field = createTextInput("profile_with_parent_placeholder", x + 135, y + 120 - 2);
 		
 		var vsdata : Object = this.getVehicleSelectorDataFromPy();
 		this.vehicle_nations.dataProvider = new DataProvider(vsdata["nations"]);
@@ -362,62 +381,43 @@ package uml
 		this.add_profile_as_parent_btn.addEventListener(ButtonEvent.CLICK, this.addNewProfile);
 		// this.profile_with_parent_field.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.addNewProfile); // don't need this one
 		
-		return x + 270; // 650
+		return {x: x + 270, y: y + 145}; // 650
 	  }
 	  
-	  internal function createForcedCustomizationSelector(x: Number, y: Number): Number {
-		// Dropdown list selecting: Target (player, ally, enemy); 
-		//							first_emblem, second_emblem; camo set of 3; paint set of 3
-		this.help_forced_customization = createLabel("Force Customization", x, y);
-		this.target_customization = createDropdown(x + 150, y - 2);
-		this.first_emblem = createDropdown(x, y + 23);
-		this.second_emblem = createDropdown(x + 130, y + 23);
-		this.force_both_emblem = createCheckbox("Force both emblems", x + 260, y + 25);
-		this.summer_camo = createDropdown(x, y + 48);
-		this.winter_camo = createDropdown(x + 130, y + 48);
-		this.desert_camo = createDropdown(x + 260, y + 48);
-		this.summer_paint = createDropdown(x, y + 73);
-		this.winter_paint = createDropdown(x + 130 , y + 73);
-		this.desert_paint = createDropdown(x + 260, y + 73);
+	  internal function createAdditionalSettings(x: Number, y: Number): Number {
+		// these don't need listener, since they are strictly updated on Apply anyway. Except the add button.
+		var additional_setting_help : LabelControl = createLabel("Additional Settings", x, y);
+		this.remove_3d_style = createCheckbox("Remove all 3D Styles", x, y + 20);
+		this.remove_unhistorical = createCheckbox("Remove Non-historical (incl. replays)", x + 150, y + 20);
+		this.remove_clan_logo = createCheckbox("Remove Clan Logo", x, y + 40);
+		var force_clan_logo_help : LabelControl = createLabel("Clan ID:", x + 150, y + 40);
+		this.force_clan_logo = createTextInput("N/A", x + 210, y + 40 - 3); this.force_clan_logo.width = 75; this.force_clan_logo.enabled = false;
+		this.swap_friendly_enable = createCheckbox("Swap ALL friendly vehicles", x, y + 60); this.swap_friendly_enable.width = 200;
+		var swap_friendly_help : LabelControl = createLabel("Using:", x, y + 80);
+		this.swap_friendly = createTextInput("swap_friendly_placeholder", x + 40, y + 80 - 3);
+		this.add_profile_friendly = createButton("Add current Profile", x + 180, y + 80, true);
+		this.swap_enemy_enable = createCheckbox("Swap ALL enemy vehicles", x, y + 100); this.swap_enemy_enable.width = 200;
+		var swap_enemy_help : LabelControl = createLabel("Using:", x, y + 120);
+		this.swap_enemy = createTextInput("swap_enemy_placeholder", x + 40, y + 120 - 3);
+		this.add_profile_enemy = createButton("Add current Profile", x + 180, y + 120, true);
 		
-		// update values to help forced customization
-		this.customization_data["sec_camoName"] = this.customization_data["camoName"].concat(); this.customization_data["sec_camoName"].unshift("Same as Summer");
-		this.customization_data["sec_paintName"] = this.customization_data["paintName"].concat(); this.customization_data["sec_paintName"].unshift("Same as Summer");
-		this.customization_data["sec_decalName"] = this.customization_data["decalName"].concat(); this.customization_data["sec_decalName"].unshift("Same as First");
-		this.customization_data["sec_camoID"] = this.customization_data["camoID"].concat(); this.customization_data["sec_camoID"].unshift(-2);
-		this.customization_data["sec_paintID"] = this.customization_data["paintID"].concat(); this.customization_data["sec_paintID"].unshift(-2);
-		this.customization_data["sec_decalID"] = this.customization_data["decalID"].concat(); this.customization_data["sec_decalID"].unshift(-2);
+		this.add_profile_friendly.addEventListener(ButtonEvent.CLICK, this.addCurrentProfileToSwapList);
+		this.add_profile_enemy.addEventListener(ButtonEvent.CLICK, this.addCurrentProfileToSwapList);
 		
-		this.target_customization.dataProvider = new DataProvider(["Player", "Ally", "Enemy"]);
-		this.first_emblem.dataProvider = new DataProvider(this.customization_data["decalName"]);
-		this.second_emblem.dataProvider = new DataProvider(this.customization_data["sec_decalName"]);
-		this.summer_camo.dataProvider = new DataProvider(this.customization_data["camoName"]);
-		this.winter_camo.dataProvider = new DataProvider(this.customization_data["sec_camoName"]);
-		this.desert_camo.dataProvider = new DataProvider(this.customization_data["sec_camoName"]);
-		this.summer_paint.dataProvider = new DataProvider(this.customization_data["paintName"]);
-		this.winter_paint.dataProvider = new DataProvider(this.customization_data["sec_paintName"]);
-		this.desert_paint.dataProvider = new DataProvider(this.customization_data["sec_paintName"]);
-		
-		this.target_customization.selectedIndex = 0;
-		var customization_data : Object = this.customization_data;
-		var _updateCustomizationData : Function = updateCustomizationData;
-		// event binding
-		this.target_customization.addEventListener(ListEvent.INDEX_CHANGE, this.reloadForcedCustomization);
-		this.first_emblem.addEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
-		this.second_emblem.addEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
-		this.force_both_emblem.addEventListener(ButtonEvent.CLICK, this.updateCustomizationData);
-		this.summer_camo.addEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
-		this.winter_camo.addEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
-		this.desert_camo.addEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
-		this.summer_paint.addEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
-		this.winter_paint.addEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
-		this.desert_paint.addEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
-		
-		return y + 100; // 410
+		return y + 140 + 10; // 410
 	  }
 	  
-	  override protected function onDispose() : void
-	  {
+	  protected function addCurrentProfileToSwapList(event : Object) : void {
+		var profile_name : String = this.list_profile_objects[this.profile_selector.selectedIndex]["name"];
+		var current_swaplist : TextInput = (event.target == this.add_profile_friendly) ? this.swap_friendly : this.swap_enemy;
+		if(current_swaplist.text == "")
+			current_swaplist.text = profile_name;
+		else if(current_swaplist.text.indexOf(profile_name) < 0) // only add when profile not exist in list
+			current_swaplist.text = current_swaplist.text + ", " + profile_name;
+		// DebugUtils.LOG_WARNING("[UML GUI][AS] Adding profile " + profile_name + " to " + (event.target == this.add_profile_friendly ? "friendly" : "enemy") + " with current text: " + current_swaplist.text );
+	  }
+	  
+	  override protected function onDispose() : void  {
         this.apply_button.removeEventListener(ButtonEvent.CLICK, this.sendStringConfigFromAS);
 		this.reload_button.removeEventListener(ButtonEvent.CLICK, this.setStringConfigToAS);
 		if(this.isStatic) {
@@ -455,18 +455,8 @@ package uml
 				this.debug_btn.removeEventListener(ButtonEvent.CLICK, this.sendDebugCmdFromAS);
 			}
 			
-			if(this.forcedCustomizationIsAvailableAtPy()) { // currently left unused
-				this.target_customization.removeEventListener(ListEvent.INDEX_CHANGE, this.reloadForcedCustomization);
-				this.first_emblem.removeEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
-				this.second_emblem.removeEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
-				this.force_both_emblem.removeEventListener(ButtonEvent.CLICK, this.updateCustomizationData);
-				this.summer_camo.removeEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
-				this.winter_camo.removeEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
-				this.desert_camo.removeEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
-				this.summer_paint.removeEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
-				this.winter_paint.removeEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
-				this.desert_paint.removeEventListener(ListEvent.INDEX_CHANGE, this.updateCustomizationData);
-			}
+			this.add_profile_friendly.removeEventListener(ButtonEvent.CLICK, this.addCurrentProfileToSwapList);
+			this.add_profile_enemy.removeEventListener(ButtonEvent.CLICK, this.addCurrentProfileToSwapList);
 		}
 		//this.profile_list.dataProvider.cleanUp();
 		//this.profile_list = null;
@@ -487,7 +477,7 @@ package uml
 	  }
 	  
 	  internal function toggleAvailabilityHybrid(enable : Boolean, profile_obj : Object = null) : void {
-		// set enable/disable hybrid availability. Split to a function due to styleSet conflicting with hybrids.
+		// set enable/disable hybrid availability. Split to a function due to styleSet soft conflicting with hybrids.
 		if(profile_obj == null) {
 			profile_obj = this.list_profile_objects[this.profile_selector.selectedIndex];
 			// DebugUtils.LOG_WARNING("[UML GUI][AS] Debug: profile_obj @toggleAvailabilityHybrid is null, recalling correct object using current selector.");
@@ -676,8 +666,10 @@ package uml
 	  
 	  internal function loadVehiclesWithCriteriaToAS() : void {
 		// attempt to load vehicles using nation, type and tier filtering
-		var vehicles : Array = this.loadVehiclesWithCriteriaFromPy(this.vehicle_nations.selectedIndex, this.vehicle_type.selectedIndex, this.vehicle_tier.selectedIndex);
-		this.vehicle_selector.dataProvider = new DataProvider(vehicles);
+		var vehicles_data : Array = this.loadVehiclesWithCriteriaFromPy(this.vehicle_nations.selectedIndex, this.vehicle_type.selectedIndex, this.vehicle_tier.selectedIndex);
+		DebugUtils.LOG_WARNING("[UML GUI][AS] Debug: vehicle data received: " + App.utils.JSON.encode(vehicles_data) + ". Check to see what failed.");
+		this.vehicle_selector_profiles = vehicles_data[0];
+		this.vehicle_selector.dataProvider = new DataProvider(vehicles_data[1]);
 		this.vehicle_selector.selectedIndex = 0;
 		this.loadVehicleProfileToAS();
 	  }
@@ -688,7 +680,7 @@ package uml
 			this.vehicle_profile_field.text = "vehicle_profile_name";
 			this.profile_with_parent_field.text = "profile_with_parent_placeholder";
 		} else {
-			this.vehicle_profile_field.text = this.loadVehicleProfileFromPy(this.vehicle_selector.dataProvider[this.vehicle_selector.selectedIndex]);
+			this.vehicle_profile_field.text = this.vehicle_selector_profiles[this.vehicle_selector.selectedIndex];
 			this.profile_with_parent_field.text =  "hybrid_" + this.vehicle_profile_field.text + "__" + String(_dateObject.time).substring(6); // unique identifier using timestamp
 		}
 	  }
@@ -753,6 +745,18 @@ package uml
 		this.onWhitelistChange();
 	  }
 	  
+	  internal function addProfileToMOE(event: Event, profile_text: String = null) : void {
+		// on clicking a vehicle within vehicle_selector, change the corresponding TextInput to the profile name
+		if(profile_text == null) {
+			profile_text = this.vehicle_profile_field.text;
+		}
+		var current_moelist : String = StringUtil.trim(this.moe_list.text);
+		if(current_moelist == "")
+			this.moe_list.text = profile_text;
+		else if(current_moelist.indexOf(profile_text) < 0) // only add when profile not exist in whitelist
+			this.moe_list.text = current_moelist + ", " + profile_text;
+	  }
+	  
 	  internal function addHangarVehicleToWhitelist() : void {
 		// retrieve the hangar vehicle from Py side and add it to whitelist
 		this.addProfileToWhitelist(null, this.getHangarVehicleFromPy());
@@ -815,10 +819,19 @@ package uml
 								"useUMLSound": this.use_UML_sound.selected,
 								"remodelsFilelist": this.remodels_filelist.text,
 								"MOErank": (this.moe_selector.selectedIndex - 1),
+								"MOElist": this.moe_list.text,
+								// "MOEnation": // sth to convert this.moe_nation.selectedIndex,
 								"lastProfileSelectedIdx": this.profile_selector.selectedIndex,
 								"listProfileObjects": this.list_all_profile_objects,
 								"ignoreList": this.list_ignore_profiles,
-								"forcedCustomization": this.forced_customization
+								"remove3DStyle": this.remove_3d_style.selected,
+								"removeClanLogo": this.remove_clan_logo.selected,
+								"removeUnhistoricalContent": this.remove_unhistorical.selected,
+								"swapAllFriendly": this.swap_friendly_enable.selected,
+								"swapAllEnemy": this.swap_enemy_enable.selected,
+								// "forceClanLogoID": this.force_clan_logo.text, // turn on when it works.
+								"friendlyProfiles": this.swap_friendly.text,
+								"enemyProfiles": this.swap_enemy.text
 								};
           this.receiveStringConfigAtPy(App.utils.JSON.encode(dict))
 	  }
@@ -853,84 +866,34 @@ package uml
 	  }
 	  
 	  public function setStringConfigToAS() : void { // paired with getStringConfig
-		  var dict : Object = App.utils.JSON.decode(this.getStringConfigFromPy());
-		  // set flags
-		  this.affect_hangar.selected = dict["affectHangar"];
-		  this.use_UML_sound.selected = dict["useUMLSound"];
-		  this.toggle_show_ignore.selected = false;
-		  this.remodels_filelist.text = dict["remodelsFilelist"]
-		  // update profile list & index to the last selected profile 
-		  if(this.isStatic) {
-			  this.list_all_profile_objects = dict["listProfileObjects"];
-			  this.list_ignore_profiles = dict["ignoreList"];
-			  // DebugUtils.LOG_WARNING("[UML GUI][AS] Debug: ignoreList: " + String(this.list_ignore_profiles));
-			  this.reloadProfileSelector(null, false);
-			  this.profile_selector.selectedIndex = dict['lastProfileSelectedIdx'] < this.list_profile_objects.length ? dict['lastProfileSelectedIdx'] : 0; // prevent delete & no applying
-			  this.loadProfileAtCurrentIndex();
-		  }
-		  // update current MOE rank; auto is -1 and goes from 0-3, therefore we can simply +1 before and after
-		  this.moe_selector.selectedIndex = dict["MOErank"] + 1;
-		  // update forcedCustomization if available
-		  this.forced_customization = dict["forcedCustomization"];
-		  if(this.forced_customization != null) {
-			  // pitfall: if the this.forced_customization dict is set and reload is called, the first selectedIndex change will attempt to reload and end up overwriting subsequent values with unset values (null).
-			  // redone the reload fn; the above is no longer true.
-			  this.reloadForcedCustomization();
-			}
-      }
-	  
-	  public function reloadForcedCustomization() : void {
-		//reload_dict = reload_dict == null ? this.forced_customization : reload_dict;
-		var target_dict : Object = this.forced_customization[this.target_customization.selectedIndex];
-		// DebugUtils.LOG_WARNING("debug @reloadForcedCustomization: " + App.utils.JSON.encode(target_dict));
-		this.first_emblem.selectedIndex = this.customization_data["decalID"].indexOf(target_dict["forcedEmblem"][0]);
-		this.second_emblem.selectedIndex = this.customization_data["sec_decalID"].indexOf(target_dict["forcedEmblem"][1]);
-		this.force_both_emblem.selected = target_dict["forcedBothEmblem"];
-		this.summer_camo.selectedIndex = this.customization_data["camoID"].indexOf(target_dict["forcedCamo"][0]);
-		this.winter_camo.selectedIndex = this.customization_data["sec_camoID"].indexOf(target_dict["forcedCamo"][1]);
-		this.desert_camo.selectedIndex = this.customization_data["sec_camoID"].indexOf(target_dict["forcedCamo"][2]);
-		this.summer_paint.selectedIndex = this.customization_data["paintID"].indexOf(target_dict["forcedPaint"][0]);
-		this.winter_paint.selectedIndex = this.customization_data["sec_paintID"].indexOf(target_dict["forcedPaint"][1]);
-		this.desert_paint.selectedIndex = this.customization_data["sec_paintID"].indexOf(target_dict["forcedPaint"][2]);
-	  }
-	  
-	  public function updateCustomizationData(e : Event) : void {
-		var target_dict : Object = this.forced_customization[this.target_customization.selectedIndex];
-		// DebugUtils.LOG_WARNING("After target_dict");
-		/*for(var key : String in this.customization_data) {
-			DebugUtils.LOG_WARNING("debug @updateCustomizationData - key [" + key + "]; length " + String(this.customization_data[key].length));
-		}*/
-		if(this.force_both_emblem == e.target) {
-			target_dict["forcedBothEmblem"] = this.force_both_emblem.selected;
-		} else {
-			switch(e.target) {
-				case this.first_emblem:
-					target_dict["forcedEmblem"][0] = this.customization_data["decalID"][this.first_emblem.selectedIndex];
-					break;
-				case this.second_emblem:
-					target_dict["forcedEmblem"][1] = this.customization_data["sec_decalID"][this.second_emblem.selectedIndex];
-					break;
-				case this.summer_camo:
-					target_dict["forcedCamo"][0] = this.customization_data["camoID"][this.summer_camo.selectedIndex];
-					break;
-				case this.winter_camo:
-					target_dict["forcedCamo"][1] = this.customization_data["sec_camoID"][this.winter_camo.selectedIndex];
-					break;
-				case this.desert_camo:
-					target_dict["forcedCamo"][2] = this.customization_data["sec_camoID"][this.desert_camo.selectedIndex];
-					break;
-				case this.summer_paint:
-					target_dict["forcedPaint"][0] = this.customization_data["paintID"][this.summer_paint.selectedIndex];
-					break;
-				case this.winter_paint:
-					target_dict["forcedPaint"][1] = this.customization_data["sec_paintID"][this.winter_paint.selectedIndex];
-					break;
-				case this.desert_paint:
-					target_dict["forcedPaint"][2] = this.customization_data["sec_paintID"][this.desert_paint.selectedIndex];
-					break;
-			}
+		var dict : Object = App.utils.JSON.decode(this.getStringConfigFromPy());
+		// set flags
+		this.affect_hangar.selected = dict["affectHangar"];
+		this.use_UML_sound.selected = dict["useUMLSound"];
+		this.toggle_show_ignore.selected = false;
+		this.remodels_filelist.text = dict["remodelsFilelist"]
+		// update profile list & index to the last selected profile 
+		if(this.isStatic) {
+			this.list_all_profile_objects = dict["listProfileObjects"];
+			this.list_ignore_profiles = dict["ignoreList"];
+			// DebugUtils.LOG_WARNING("[UML GUI][AS] Debug: ignoreList: " + String(this.list_ignore_profiles));
+			this.reloadProfileSelector(null, false);
+			this.profile_selector.selectedIndex = dict['lastProfileSelectedIdx'] < this.list_profile_objects.length ? dict['lastProfileSelectedIdx'] : 0; // prevent delete & no applying
+			this.loadProfileAtCurrentIndex();
 		}
-	  }
+		// update current MOE rank; auto is -1 and goes from 0-3, therefore we can simply +1 before and after
+		this.moe_selector.selectedIndex = dict["MOErank"] + 1;
+		this.moe_list.text = dict["MOElist"];
+		// update all corresponding additional settings
+		this.remove_3d_style.selected = dict["remove3DStyle"];
+		this.remove_clan_logo.selected = dict["removeClanLogo"];
+		this.remove_unhistorical.selected = dict["removeUnhistoricalContent"];
+		this.swap_friendly_enable.selected = dict["swapAllFriendly"];
+		this.swap_enemy_enable.selected = dict["swapAllEnemy"];
+		// this.force_clan_logo.text = dict["forceClanLogoID"]; // turn on when it works.
+		this.swap_friendly.text = dict["friendlyProfiles"];
+		this.swap_enemy.text = dict["enemyProfiles"];
+      }
 	  
 	  public function updateHybridParts(e : Event) : void {
 		var targeted_profile : Object = this.list_profile_objects[this.profile_selector.selectedIndex];

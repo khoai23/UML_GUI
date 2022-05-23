@@ -14,6 +14,7 @@ from debug_utils import LOG_WARNING, LOG_ERROR
 import os, io
 import random
 import json
+import re
 
 TYPE_PLAYER, TYPE_ALLY, TYPE_ENEMY = "player", "ally", "enemy"
 BigWorld.forcedCustomizationDict = getattr(BigWorld, "forcedCustomizationDict", dict())
@@ -94,13 +95,27 @@ def checkCustomizationID(id, customization_sets):
         
 def applyInHangar():
     # ignore by default or bound to UML's affectHangar, or bound to forcedCustomizationDict
-    return BigWorld.forcedCustomizationDict(TYPE_PLAYER, dict()).get("affectHangar", getattr(getattr(BigWorld, "om", None), "affectHangar", False))
+    return BigWorld.forcedCustomizationDict.get(TYPE_PLAYER, dict()).get("affectHangar", getattr(getattr(BigWorld, "om", None), "affectHangar", False))
+        
+def printDebug(*args, **kwargs)
+    # print only when UML's debug is enabled
+    if getattr(getattr(BigWorld, "om", None), "debug", False):
+        print(*args, **kwargs)
         
 def retrieveSeason(): # return season. Adding the check since this is querried in hangar as well
     if hasattr(BigWorld.player(), "arena"):
         return camouflages._currentMapSeason()
     return None
     
+def isBlank(value):
+    # three types of blanks: None, "" and [] can be used for this.
+    return value is None or (isinstance(value, (str, list, tuple)) and len(value) == 0)
+
+re_validlist = re.compile(r"^[\w\d_\-,\s]+$")
+def isValidList(lst):
+    return all(re.match(re_validlist, value) is not None for value in lst)
+    # blacklist/whitelist can only receive [\w\d_-] (char, digit, underscore and dash); split using comma and possibly space
+   
 # preset_personal_number =  vehicles.g_cache.customization20().personal_numbers[1]
 
 #DECAL_TYPE_LOOKUP = {TYPE_PLAYER: "playerForcedEmblem", TYPE_ALLY: "allyForcedEmblem", TYPE_ENEMY: "enemyForcedEmblem"}
@@ -144,15 +159,15 @@ def checkList(vehicleType, vehicleDescriptor):
                 TYPE_ENEMY: {"forcedEmblem": None, "forcedCamo": None, "forcedPaint": None, "forcedBothEmblem": None, "blacklist": None, "whitelist": None, "personalNumberID": None, "personalNumber": None}
             }
     vehicleName = vehicleDescriptor.type.name
-    if(BigWorld.forcedCustomizationDict[vehicleType].get("whitelist", None)): # WHITELIST TAKE PRECEDENCE
+    if not isBlank(BigWorld.forcedCustomizationDict[vehicleType].get("whitelist", None)): # WHITELIST TAKE PRECEDENCE
         # check if vehicle is in whitelist
         whitelist = BigWorld.forcedCustomizationDict[vehicleType]["whitelist"]
-        # print("Found whitelist: {}; searching for {}".format(whitelist, vehicleName))
+        #print("Found whitelist: {}; searching for {}".format(whitelist, vehicleName))
         return any(wtn in vehicleName for wtn in whitelist)
-    elif(BigWorld.forcedCustomizationDict[vehicleType].get("blacklist", None)):
+    elif not isBlank(BigWorld.forcedCustomizationDict[vehicleType].get("blacklist", None)):
         # check if vehicle not in blacklist
         blacklist = BigWorld.forcedCustomizationDict[vehicleType]["blacklist"]
-        # print("Found blacklist: {}; searching for {}".format(blacklist, vehicleName))
+        #print("Found blacklist: {}; searching for {}".format(blacklist, vehicleName))
         return not any(wtn in vehicleName for wtn in blacklist)
     else:
         # default to every vehicle.
@@ -183,7 +198,7 @@ def modifyOutfitComponent(outfitComponent, outfitCD=None, vehicleDescriptor=None
     #try:
     #    print("Vehicle type {:s} with name {:s}".format(vehicleType, vehicleDescriptor.type.name))
     #except Exception as e:
-    #    print("Error @replaceOwnCustomization: " + str(e))
+    #    print("Error @modifyOutfitComponent: " + str(e))
     if not checkList(vehicleType, vehicleDescriptor):
         # when False, either not in whitelist or in blacklist, do not modify
         return outfitComponent
@@ -194,11 +209,11 @@ def modifyOutfitComponent(outfitComponent, outfitCD=None, vehicleDescriptor=None
         existing_emblems = [emb for emb in outfitComponent.decals if emb.appliedTo & emblem_regions_val]
         replacing_emblems = existing_emblems # [ DecalComponent(id=e.id, appliedTo=reg) for e in existing_emblems for reg in decomposeApplyAreaRegion(e.appliedTo, ApplyArea.EMBLEM_REGIONS) ]
         original_decals = list(outfitComponent.decals)
-        # print("Debug @replaceOwnCustomization: existing emblem regions {}, replacing emblem regions {}".format(existing_emblems, replacing_emblems))
+        # print("Debug @modifyOutfitComponent: existing emblem regions {}, replacing emblem regions {}".format(existing_emblems, replacing_emblems))
         current_emblem_val = sum(emb.appliedTo for emb in existing_emblems)
         if(emblem_regions_val < current_emblem_val):
             # this shouldn't happen; log it when it does
-            print("Error @replaceOwnCustomization: current emblem encompassing regions {}; while possible emblems encompass {}".format(current_emblem_val, emblem_region_val))
+            print("[ROC] Error @modifyOutfitComponent: current emblem encompassing regions {}; while possible emblems encompass {}".format(current_emblem_val, emblem_region_val))
         elif(BigWorld.forcedCustomizationDict[vehicleType]["forcedBothEmblem"] and emblem_regions_val > current_emblem_val):
             # when this two values are mismatched, creating new DecalComponent to house needed emblems
             added_emblems = [DecalComponent(id=-1, appliedTo=reg) for reg in decomposeApplyAreaRegion(emblem_regions_val - current_emblem_val, ApplyArea.EMBLEM_REGIONS)]
@@ -219,7 +234,7 @@ def modifyOutfitComponent(outfitComponent, outfitCD=None, vehicleDescriptor=None
         # outfitComponent.decals.extend(replacing_emblems)
         # remove nonpositive ids (for -1, but can also deal with errant -2)
         del [d for d in outfitComponent.decals if d.id <= 0][:]
-        # print("Debug @replaceOwnCustomization: before modifications {}, after modification {}".format(original_decals, outfitComponent.decals))
+        # print("Debug @modifyOutfitComponent: before modifications {}, after modification {}".format(original_decals, outfitComponent.decals))
     # override camo (also in battle only)
     consistentRandomIdx = random.randint(0, 12) % len(WEATHER_LOOKUP)
     if getCamoOrPaint(vehicleType, customization_name="forcedCamo", consistentRandomIdx=consistentRandomIdx):
@@ -242,9 +257,9 @@ def modifyOutfitComponent(outfitComponent, outfitCD=None, vehicleDescriptor=None
         emblem_regions_val, inscription_regions_val = getAvailableDecalRegions(vehicleDescriptor)
         current_inscription_val = sum(ins.appliedTo for ins in outfitComponent.decals if ins.appliedTo in ApplyArea.INSCRIPTION_REGIONS)
         available_inscription_slots = set(decomposeApplyAreaRegion(inscription_regions_val, ApplyArea.INSCRIPTION_REGIONS)) - set(decomposeApplyAreaRegion(current_inscription_val, ApplyArea.INSCRIPTION_REGIONS))
-        print("Debug @replaceOwnCustomization: available inscriptions: {} {} - {}".format(available_inscription_slots, inscription_regions_val, current_inscription_val))
+        printDebug("Debug @modifyOutfitComponent: available inscriptions: {} {} - {}".format(available_inscription_slots, inscription_regions_val, current_inscription_val))
         if(len(available_inscription_slots) == 0):
-            print("Debug @replaceOwnCustomization: No available slot to add personal number. Ignoring the positions")
+            print("[ROC] @modifyOutfitComponent: No available slot to add personal number. Ignoring the positions")
         else:
             personal_numbers_id = BigWorld.forcedCustomizationDict[vehicleType]["personalNumberID"]
             personal_number_value = BigWorld.forcedCustomizationDict[vehicleType]["personalNumber"]
@@ -253,7 +268,7 @@ def modifyOutfitComponent(outfitComponent, outfitCD=None, vehicleDescriptor=None
             if(personal_number_value == RANDOMIZE):
                 numberval = random.randint(0, MODULO) # random mode, picking a random value.
             elif(personal_number_value == HASH): 
-                numberval = (id(vehicleDescriptor) * id(ApplyArea) + id(BigWorld)) % MODULO # hash mode; TODO try something more randomized?
+                numberval = ((id(vehicleDescriptor) * id(BigWorld) + id(ApplyArea)) // 97)  % MODULO # hash mode; TODO try something more randomized?
             else:
                 numberval = personal_number_value % MODULO
             numberstr = PERSONAL_NUMBERS_FORMAT.get(personal_number_digitcount, "{:03d}").format(numberval) # include leading zeros if needed. 
@@ -263,6 +278,7 @@ def modifyOutfitComponent(outfitComponent, outfitCD=None, vehicleDescriptor=None
 
 old_prepareBattleOutfit = camouflages.prepareBattleOutfit
 def new_prepareBattleOutfit(outfitCD, vehicleDescriptor, vehicleId):
+    printDebug("[ROC] Injection started for camouflages.prepareBattleOutfit")
     outfit = old_prepareBattleOutfit(outfitCD, vehicleDescriptor, vehicleId)
     outfit_new_components = modifyOutfitComponent(outfit.pack(), outfitCD=outfitCD, vehicleDescriptor=vehicleDescriptor, vehicleId=vehicleId)
     return Outfit(component=outfit_new_components, vehicleCD=outfit.vehicleCD)
@@ -274,10 +290,10 @@ from CurrentVehicle import g_currentVehicle, g_currentPreviewVehicle
 # self.__reload(self.__vDesc, self.__vState, outfit or self.__outfit)
 old_internal_reload = HangarVehicleAppearance._HangarVehicleAppearance__reload
 def new_internal_reload(self, vDesc, vState, outfit):
-    if True:
-        print("[ROC] Injection started for HangarVehicleAppearance.__reload")
-        if outfit.style and outfit.style.isProgression:
-            outfit = self.__getStyleProgressionOutfitData(outfit)
+    if applyInHangar():
+        printDebug("[ROC] Injection started for HangarVehicleAppearance.__reload")
+        if isinstance(self, HangarVehicleAppearance) and outfit.style and outfit.style.isProgression:
+            outfit = self._HangarVehicleAppearance__getStyleProgressionOutfitData(outfit)
         fakeOutfitCD = "Whatever" if outfit else None
         outfit_new_components = modifyOutfitComponent(outfit.pack(), outfitCD=fakeOutfitCD, vehicleDescriptor=vDesc, vehicleId=None)
         outfit = Outfit(component=outfit_new_components, vehicleCD=outfit.vehicleCD)
@@ -320,8 +336,10 @@ class ReplaceOwnCustomizationGUI(AbstractWindowView):
         
     def getCustomizationDictFromPy(self, reloadFromDisk=False): # LOAD + RELOAD FUNCTION
         if(reloadFromDisk):
+            ResMgr.purge(ReplaceOwnCustomizationGUI.UML_PATH, True) # would this work?
             ReplaceOwnCustomizationGUI.loadForcedCustomizationFromDisk(self.sectionMain)
         cleaned_data = ReplaceOwnCustomizationGUI.getCleanedForcedCustomization()
+        # print("[ROC] Pre-dump data :" + str(cleaned_data))
         return json.dumps(cleaned_data)
         
     def updateCustomizationDictAtPy(self, dictStr): # SAVE function
@@ -336,23 +354,27 @@ class ReplaceOwnCustomizationGUI(AbstractWindowView):
         # from file to ingame dict function
         if(ReplaceOwnCustomizationGUI.availableUML()): # UML mode
             sectionMain = sectionMain or ResMgr.openSection(uml_path)
+            ResMgr.purge(uml_path, True)
             for namespace in (TYPE_PLAYER, TYPE_ALLY, TYPE_ENEMY):
                 keyed_dict = BigWorld.forcedCustomizationDict[namespace] = BigWorld.forcedCustomizationDict.get(namespace, dict())
                 for field, size in (("forcedEmblem", 2), ("forcedCamo", 3), ("forcedPaint", 3), ): # tuple-able int values
                     keyed_dict[field] = tryLoadIntValue(sectionMain, "{:s}/{:s}".format(namespace, field), tupleSizeCheck=size, default=0)
                 keyed_dict["forcedBothEmblem"] = ReplaceOwnCustomizationGUI.readValueFromSection(sectionMain, "{:s}/forcedBothEmblem".format(namespace), bool, default=False) # bool values
                 for field in ("blacklist", "whitelist"): # str values
-                    keyed_dict[field] = ReplaceOwnCustomizationGUI.readValueFromSection(sectionMain, "{:s}/{:s}".format(namespace, field), (tuple, str), default="")
+                    keyed_dict[field] = ReplaceOwnCustomizationGUI.readValueFromSection(sectionMain, "{:s}/{:s}".format(namespace, field), (tuple, str), default=[])
+                    if not isValidList(keyed_dict[field]):
+                        print("Error while loading {:s} for {:s} - {}. Reverting list to normal".format(field, namespace, keyed_dict[field]))
+                        keyed_dict[field] == ""
                 keyed_dict["personalNumberID"] = ReplaceOwnCustomizationGUI.readValueFromSection(sectionMain, "{:s}/personalNumberID".format(namespace), int, default=0) # int
                 keyed_dict["personalNumber"] = tryLoadPersonalNumber(sectionMain, "{:s}/personalNumber".format(namespace), default=0) # int or possible keywords
                 if(namespace == TYPE_PLAYER): # affectHangar only exist for [player]
                     keyed_dict["affectHangar"] = ReplaceOwnCustomizationGUI.readValueFromSection(sectionMain, "{:s}/affectHangar".format(namespace), bool, default=False)
-            print("Finished loading UML mode @loadForcedCustomizationFromDisk, loaded structure: {}".format(BigWorld.forcedCustomizationDict))
+            printDebug("Finished loading UML mode @loadForcedCustomizationFromDisk, loaded structure: {}".format(BigWorld.forcedCustomizationDict))
         else: # JSON mode
             if(os.path.isfile(json_path)):
                 with io.open(json_path, "r") as jf:
                     BigWorld.forcedCustomizationDict.update( json.load(jf) )
-                print("Finished loading JSON mode @loadForcedCustomizationFromDisk, loaded structure: {}".format(BigWorld.forcedCustomizationDict))
+                printDebug("Finished loading JSON mode @loadForcedCustomizationFromDisk, loaded structure: {}".format(BigWorld.forcedCustomizationDict))
             else:
                 return False
         # recheck to ascertain the fields are valid
@@ -375,37 +397,59 @@ class ReplaceOwnCustomizationGUI(AbstractWindowView):
                 if(isinstance(config[namespace][field], int) and size and size > 1):
                     # duplicate to help the GUI not messing up; thankfully the forcedBothEmblem is bool
                     config[namespace][field] = tuple([config[namespace][field]] + [-2] * (size - 1))
+            for field in ["blacklist", "whitelist"]:
+                # lists are updated from str to list
+                value = config[namespace].get(field, [])
+                if(not isinstance(value, str)):
+                    value = "" if len(value) == 0 else ", ".join(value)
+                    config[namespace][field] = value
         return config
             
     @staticmethod
     def saveForcedCustomization(customizationdata, sectionMain=None): # Function to write changes to file
-        # print("[UML GUI] debug: ", customizationdata)
-        if(ReplaceOwnCustomizationGUI.availableUML()): # UML mode
-            sectionMain = sectionMain or ResMgr.openSection(ReplaceOwnCustomizationGUI.UML_PATH)
-            for namespace, datadict in customizationdata.items():
-                if not isinstance(datadict, dict):
-                    continue # only apply this for recursive child dicts
-                for field, value in datadict.items():
-                    if(isinstance(value, (tuple, list)) and all((isinstance(v, int) for v in value)) ):
+        # print("[ROC] debug @saveForcedCustomization: ", customizationdata)
+        # update the customizationdata to correct format
+        for namespace, datadict in customizationdata.items():
+            if not isinstance(datadict, dict):
+                continue # only apply this for recursive child dicts
+            for field, value in datadict.items():
+                if (field in ("blacklist", "whitelist") and isinstance(value, (unicode, str))):
+                    # convert string in AS to their list version (when needed)
+                    value = str(value)
+                    if len(value) > 0: # there is an actual valid string
+                        value = [value] if "," not in value else [pcs.strip() for pcs in value.split(",")]
+                    else: # empty string
+                        value = []
+                try:
+                    if(isinstance(value, (tuple, list)) and len(value) > 0 and all((isinstance(v, int) for v in value)) ): # all actually return true on empty
                         if all((v == -2 for v in value[1:])):
                             # if all other values has -2, collapse to only one value
                             value = value[0]
                         else:
                             # if not, copy all the -2 with the base
                             value = tuple([v if v != -2 else value[0] for v in value])
-                    ReplaceOwnCustomizationGUI.writeDataToSection(sectionMain, "{:s}/{:s}".format(namespace, field), value)
-                    datadict[field] = value # reset the errant values from -2s
-                    # print("[UML GUI] debug write to section {}/{} {} ({})".format(namespace, field, value, type(value)))
+                except Exception as e:
+                    print(e, field, value)
+                    raise e
+                datadict[field] = value # reset the values to their correct formatting
+        # save to XML/JSON depending on which mode
+        if(ReplaceOwnCustomizationGUI.availableUML()): # UML mode
+            sectionMain = sectionMain or ResMgr.openSection(ReplaceOwnCustomizationGUI.UML_PATH)
+            for namespace, datadict in customizationdata.items():
+                if isinstance(datadict, dict):
+                    for field, value in datadict.items():
+                        ReplaceOwnCustomizationGUI.writeDataToSection(sectionMain, "{:s}/{:s}".format(namespace, field), value)
             sectionMain.save(); ResMgr.purge(ReplaceOwnCustomizationGUI.UML_PATH, True)
         else:
             with io.open(ReplaceOwnCustomizationGUI.JSON_PATH, "w") as jf:
                 json.dump(customizationdata, jf)
+        BigWorld.forcedCustomizationDict.update(customizationdata)
         
     @staticmethod
     def writeDataToSection(section, key, value, valuetype=None):
         # attempt to write the key with value into the corresponding sections.
         if(value is None):
-            print("[ROC] Error: None received for section {}; reformat with correct blank types.".format(key))
+            print("[ROC] Error: None received for section {}; fix with correct types before trying again.".format(key))
             return
         if(isinstance(value, (str, unicode))):
             section.writeString(key, value);

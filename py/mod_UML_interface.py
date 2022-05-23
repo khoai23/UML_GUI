@@ -57,10 +57,19 @@ class UML_MainGUI(UML_mainMeta):
         self.metakey = {"remodelsFilelist" : "configLib"} # keys that will be written to sectionMeta
         self.mainkey = {"affectHangar":"affectHangar", 
                         "useUMLSound":"useUMLSound", 
-                        "MOErank": "MOE_rank",
+                        "MOErank": "MOE_rank", # MOE
+                        "MOEnation": "MOE_nation",
+                        "MOElist": "MOE_list",
+                        "removeUnhistoricalContent": "removeUnhistoricalContent", # Additional settings
+                        "removeClanLogo": "removeClanLogo",
+                        "remove3DStyle": "remove3DStyle",
+                        "forceClanLogoID": "forceClanLogoID",
+                        "swapAllFriendly": "swapAllFriendly",
+                        "swapAllEnemy": "swapAllEnemy",
+                        "friendlyProfiles": "friendlyProfiles",
+                        "enemyProfiles": "enemyProfiles",
                         "ignoreList": "ignoreList"
                        } # keys that will be written to sectionMain
-        
         # self.dumpCamouflageData()
         
         # Construct tank data
@@ -150,7 +159,7 @@ class UML_MainGUI(UML_mainMeta):
             usedSection.writeInt(truekey, value);
         elif(isinstance(value, (tuple, list))):
             # write tuple using UML formatting (separated by comma)
-            usedSection.writeString(truekey, ", ".join(str(v) for v in value) )
+            usedSection.writeString(truekey, ", ".join(str(v).strip() for v in value) )
         else:
             print("[UML GUI] Unknown type {} of value {}, can't write to chosen section.".format(type(value), value))
     @property
@@ -278,13 +287,29 @@ class UML_MainGUI(UML_mainMeta):
         config['affectHangar'] = getattr(om, 'affectHangar', False)
         config['useUMLSound'] = getattr(om, 'useUMLSound', False)
         config['MOErank'] = getattr(om, 'MOErank', -1)
+        config['MOEnation'] = self.readValueFromSection(self.sectionMain, "MOE_nation", str, sectionCtx=None, default="placeholder_moenation")
+        config['MOElist'] = self.readValueFromSection(self.sectionMain, "MOE_list", str, sectionCtx=None, default="placeholder_moelist")
         # config['forcedEmblem'] = getattr(om, 'forcedEmblem', 0)
-        config['lastProfileSelectedIdx'] = getattr(om, 'lastProfileSelectedIdx', 0)
         
         config['listProfileObjects'] = self.retrieveProfileSettings(self.sectionMainModel)
-        config['forcedCustomization'] = None
         config['remodelsFilelist'] = self.readValueFromSection(self.sectionMeta, "configLib", str, sectionCtx=None, default="placeholder_list_of_libs")
         config['ignoreList'] = self.readValueFromSection(self.sectionMain, "ignoreList", (tuple, str), sectionCtx=None, default=[])
+        
+        config['removeUnhistoricalContent'] = self.readValueFromSection(self.sectionMain, "removeUnhistoricalContent", bool, sectionCtx=None, default=False)
+        config['removeClanLogo'] = self.readValueFromSection(self.sectionMain, "removeClanLogo", bool, sectionCtx=None, default=False)
+        config['remove3DStyle'] = self.readValueFromSection(self.sectionMain, "remove3DStyle", bool, sectionCtx=None, default=False)
+        config['forceClanLogoID'] = self.readValueFromSection(self.sectionMain, "forceClanLogoID", int, sectionCtx=None, default=0)
+        config['swapAllFriendly'] = self.readValueFromSection(self.sectionMain, "swapAllFriendly", bool, sectionCtx=None, default=False)
+        config['swapAllEnemy'] = self.readValueFromSection(self.sectionMain, "swapAllEnemy", bool, sectionCtx=None, default=False)
+        config['friendlyProfiles'] = self.readValueFromSection(self.sectionMain, "friendlyProfiles", (tuple, str), sectionCtx=None, default=[])
+        config['enemyProfiles'] = self.readValueFromSection(self.sectionMain, "enemyProfiles", (tuple, str), sectionCtx=None, default=[])
+        
+        config['hotkeyAnimation'] = self.readValueFromSection(self.sectionMain, "hotkey_animation", str, sectionCtx=None, default="KEY_INSERT")
+        config['hotkeyAnimationReverse'] = self.readValueFromSection(self.sectionMain, "hotkey_animation_reverse", str, sectionCtx=None, default="KEY_DELETE")
+        config['hotkeyFireSecondary'] = self.readValueFromSection(self.sectionMain, "hotkey_fire_secondary", str, sectionCtx=None, default="KEY_BACKSLASH")
+        
+        config['lastProfileSelectedIdx'] = getattr(om, 'lastProfileSelectedIdx', 0)
+        # self.printObjToLog(config)
         return json.dumps(config)
     
     def getVehicleSelectorDataFromPy(self):
@@ -310,7 +335,9 @@ class UML_MainGUI(UML_mainMeta):
             vehicles = vehicles & self._type_data[str_type]
         if(str_tier is not None):
             vehicles = vehicles & self._tier_data[str_tier]
-        return [self._code_to_tank.get(v, v) for v in sorted(list(vehicles))]
+        tank_codes = list(sorted(list(vehicles)))
+        tank_names = [self._code_to_tank.get(v, v) for v in tank_codes]
+        return (tank_codes, tank_names)
         
     def loadVehicleProfileFromPy(self, name):
         try:

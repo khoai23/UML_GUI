@@ -20,7 +20,7 @@ Face normal invertion:
 - Select gun object -> Editable Mesh, Yes -> use Selction, Face -> Ctrl+A to select all -> Surface Properties, Flip
 - Select gun object -> Modifier List, Normal -> uncheck Flip Normal -> Collapse To
 Vertex normal invertion:
-Tools -> Mirror
+Tools -> Mirror; then Modifier -> Mirror
 
 - Animate antenna:
  + Create two bones @ root and tip (Create -> System -> Bones IK chain). Can create multiple bones, but should only assign those two to the mesh
@@ -91,15 +91,21 @@ How to do fading:
 - Color -> Curve, reorganize as wanted
 - If want to copy one mask to another, do Layer to Selection, then Add Layer Mask with "Selection" option
 
+How to copy paint mask to camo mask:
+Need GMM (paint) and AO (camo); generate your own if needed.
+Open both, Colors -> Decompose (remember this is RGBA) to get base layers; copy GMM Blue (and __resize__ if needed, most of the time) to AO Alpha; 
+Once anchored, Recompose and Export using DTX5
+Usually perform on HD will suffice if you don't intent to zoom too much, but it's best practice to do both. SD has mipmap, HD doesn't, so best to do them separately
+
 OTHER:
 Soviet sticker: 15924, 15872, 15877 looks great; 15926 is a plain, faded white star
 Vietnam sticker: 410 is flag, 38 is armored flag
 
 Prefered camos:
 513, 512, 514 (large spots); 555, 554, 556 (7th aniv); 634, 635, 636 (Expeditionary)
-	Summer independent: 638 (Homeland), 660 (1st Guard), 576 (Fire Bulge), 
-	Winter independent: 635 (Glass), 623 (Alfa), 622 (Btl Moscow), 598 (Hunt Silver), 560 (Western Front), 387 (Black Marble), 302 (Polar Bear)
-	Desert independent: 618 (Thanksgiving), 553 (Four tone floral), 299 (Lancelot)
-	
+	Summer independent: 638 (Homeland), 660 (1st Guard), 576 (Fire Bulge), 645 (Let's celebrate), 90 (Mil. Korean)
+	Winter independent: 635 (Glass), 623 (Alfa), 622 (Btl Moscow), 598 (Hunt Silver), 560 (Western Front), 302 (Polar Bear)
+	Desert independent: 618 (Thanksgiving), 553 (Four tone floral), 299 (Lancelot), 183 (Char de Carton), 312 (Southern Wind)
+	Interesting texture (relies on paint): 387 (Black Marble)
 	
 Powerpoint Mac PList: Library\Preferences\com.microsoft.Powerpoint.plist

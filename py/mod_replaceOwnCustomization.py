@@ -97,11 +97,11 @@ def applyInHangar():
     # ignore by default or bound to UML's affectHangar, or bound to forcedCustomizationDict
     return BigWorld.forcedCustomizationDict.get(TYPE_PLAYER, dict()).get("affectHangar", getattr(getattr(BigWorld, "om", None), "affectHangar", False))
         
-def printDebug(*args, **kwargs)
+def printDebug(content): # py2 is retarded, can't use args and kwargs
     # print only when UML's debug is enabled
     if getattr(getattr(BigWorld, "om", None), "debug", False):
-        print(*args, **kwargs)
-        
+        print(content)
+    
 def retrieveSeason(): # return season. Adding the check since this is querried in hangar as well
     if hasattr(BigWorld.player(), "arena"):
         return camouflages._currentMapSeason()
@@ -120,6 +120,9 @@ def isValidList(lst):
 
 #DECAL_TYPE_LOOKUP = {TYPE_PLAYER: "playerForcedEmblem", TYPE_ALLY: "allyForcedEmblem", TYPE_ENEMY: "enemyForcedEmblem"}
 #FORCED_BOTH_LOOKUP = {TYPE_PLAYER: "playerForcedBothEmblem", TYPE_ALLY: "allyForcedBothEmblem", TYPE_ENEMY: "enemyForcedBothEmblem"}
+
+def exclude3DStyle(vehicleType):
+    return BigWorld.forcedCustomizationDict[vehicleType].get("exclude3DStyle", False)
 
 def tryGetDecal(vehicleType):
     """Attempt to load and get decal index either OM or a set file."""
@@ -154,9 +157,9 @@ def checkList(vehicleType, vehicleDescriptor):
         if not ReplaceOwnCustomizationGUI.loadForcedCustomizationFromDisk():
             print("Warning @replaceOwnCustomization: Neither UML nor text config detected. The mod will do nothing.")
             BigWorld.forcedCustomizationDict = {
-                TYPE_PLAYER: {"forcedEmblem": None, "forcedCamo": None, "forcedPaint": None, "forcedBothEmblem": None, "blacklist": None, "whitelist": None, "personalNumberID": None, "personalNumber": None},
-                TYPE_ALLY: {"forcedEmblem": None, "forcedCamo": None, "forcedPaint": None, "forcedBothEmblem": None, "blacklist": None, "whitelist": None, "personalNumberID": None, "personalNumber": None},
-                TYPE_ENEMY: {"forcedEmblem": None, "forcedCamo": None, "forcedPaint": None, "forcedBothEmblem": None, "blacklist": None, "whitelist": None, "personalNumberID": None, "personalNumber": None}
+                TYPE_PLAYER: {"forcedEmblem": None, "forcedCamo": None, "forcedPaint": None, "forcedBothEmblem": None, "blacklist": None, "whitelist": None, "personalNumberID": None, "personalNumber": None, "exclude3DStyle": False},
+                TYPE_ALLY: {"forcedEmblem": None, "forcedCamo": None, "forcedPaint": None, "forcedBothEmblem": None, "blacklist": None, "whitelist": None, "personalNumberID": None, "personalNumber": None, "exclude3DStyle": False},
+                TYPE_ENEMY: {"forcedEmblem": None, "forcedCamo": None, "forcedPaint": None, "forcedBothEmblem": None, "blacklist": None, "whitelist": None, "personalNumberID": None, "personalNumber": None, "exclude3DStyle": False}
             }
     vehicleName = vehicleDescriptor.type.name
     if not isBlank(BigWorld.forcedCustomizationDict[vehicleType].get("whitelist", None)): # WHITELIST TAKE PRECEDENCE
@@ -181,7 +184,7 @@ def decomposeApplyAreaRegion(combinedRegionValue, regionList=ApplyArea.RANGE):
         return []
     return [r for r in regionList if r & combinedRegionValue]
 
-def modifyOutfitComponent(outfitComponent, outfitCD=None, vehicleDescriptor=None, vehicleId=None):
+def modifyOutfitComponent(outfitComponent, outfitCD=None, vehicleDescriptor=None, vehicleId=None, previousOutfit=None):
     # INJECTION HERE
     if(not outfitCD and not BigWorld.forcedCustomizationDict.get("overrideEmptyOutfit", False)):
         return outfitComponent # if the value is default (e.g dead vehicles), do not modify
@@ -201,6 +204,9 @@ def modifyOutfitComponent(outfitComponent, outfitCD=None, vehicleDescriptor=None
     #    print("Error @modifyOutfitComponent: " + str(e))
     if not checkList(vehicleType, vehicleDescriptor):
         # when False, either not in whitelist or in blacklist, do not modify
+        return outfitComponent
+    if exclude3DStyle(vehicleType) and previousOutfit.modelsSet != "":
+        # when option is false, do not modify 3d styles with camo/decals/whatever
         return outfitComponent
     # override decals (in battle only; when the decal value is not None or 0)
     # decal could be inscriptions or emblem; only replace the latter by locating their corresponding regions
@@ -280,7 +286,7 @@ old_prepareBattleOutfit = camouflages.prepareBattleOutfit
 def new_prepareBattleOutfit(outfitCD, vehicleDescriptor, vehicleId):
     printDebug("[ROC] Injection started for camouflages.prepareBattleOutfit")
     outfit = old_prepareBattleOutfit(outfitCD, vehicleDescriptor, vehicleId)
-    outfit_new_components = modifyOutfitComponent(outfit.pack(), outfitCD=outfitCD, vehicleDescriptor=vehicleDescriptor, vehicleId=vehicleId)
+    outfit_new_components = modifyOutfitComponent(outfit.pack(), outfitCD=outfitCD, vehicleDescriptor=vehicleDescriptor, vehicleId=vehicleId, previousOutfit=outfit)
     return Outfit(component=outfit_new_components, vehicleCD=outfit.vehicleCD)
 camouflages.prepareBattleOutfit = new_prepareBattleOutfit
 
@@ -295,7 +301,7 @@ def new_internal_reload(self, vDesc, vState, outfit):
         if isinstance(self, HangarVehicleAppearance) and outfit.style and outfit.style.isProgression:
             outfit = self._HangarVehicleAppearance__getStyleProgressionOutfitData(outfit)
         fakeOutfitCD = "Whatever" if outfit else None
-        outfit_new_components = modifyOutfitComponent(outfit.pack(), outfitCD=fakeOutfitCD, vehicleDescriptor=vDesc, vehicleId=None)
+        outfit_new_components = modifyOutfitComponent(outfit.pack(), outfitCD=fakeOutfitCD, vehicleDescriptor=vDesc, vehicleId=None, previousOutfit=outfit)
         outfit = Outfit(component=outfit_new_components, vehicleCD=outfit.vehicleCD)
     return old_internal_reload(self, vDesc, vState, outfit)
 HangarVehicleAppearance._HangarVehicleAppearance__reload = new_internal_reload
@@ -360,6 +366,7 @@ class ReplaceOwnCustomizationGUI(AbstractWindowView):
                 for field, size in (("forcedEmblem", 2), ("forcedCamo", 3), ("forcedPaint", 3), ): # tuple-able int values
                     keyed_dict[field] = tryLoadIntValue(sectionMain, "{:s}/{:s}".format(namespace, field), tupleSizeCheck=size, default=0)
                 keyed_dict["forcedBothEmblem"] = ReplaceOwnCustomizationGUI.readValueFromSection(sectionMain, "{:s}/forcedBothEmblem".format(namespace), bool, default=False) # bool values
+                keyed_dict["exclude3DStyle"] = ReplaceOwnCustomizationGUI.readValueFromSection(sectionMain, "{:s}/exclude3DStyle".format(namespace), bool, default=False)
                 for field in ("blacklist", "whitelist"): # str values
                     keyed_dict[field] = ReplaceOwnCustomizationGUI.readValueFromSection(sectionMain, "{:s}/{:s}".format(namespace, field), (tuple, str), default=[])
                     if not isValidList(keyed_dict[field]):
@@ -391,7 +398,7 @@ class ReplaceOwnCustomizationGUI(AbstractWindowView):
             config[namespace] = dict(BigWorld.forcedCustomizationDict[namespace])
         # update for everything
         for namespace in (TYPE_PLAYER, TYPE_ALLY, TYPE_ENEMY):
-            for field, size in [("forcedEmblem", 2), ("forcedBothEmblem", None), ("forcedCamo", 3), ("forcedPaint", 3)]:
+            for field, size in [("forcedEmblem", 2), ("forcedBothEmblem", None), ("exclude3DStyle", None), ("forcedCamo", 3), ("forcedPaint", 3)]:
                 if(config[namespace][field] is None): # None and 0 are functionally the same thing
                     config[namespace][field] = 0
                 if(isinstance(config[namespace][field], int) and size and size > 1):

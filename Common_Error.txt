@@ -80,7 +80,7 @@ AO map:
 - A is camouflage exclusion map. Black will not receive camo.
 
 GMM map:
-- R is gloss map - white will be more reflective (white is glass-like)
+- R is smooth/gloss map - white will be more reflective (white is glass-like)
 - G is metallic map - white will look more like bare metal
 - B is paint exclusion map. Black will not receive paint
 
@@ -90,6 +90,9 @@ How to do fading:
 - Noise -> Plasma, change seed + turbulence until the regions look fine
 - Color -> Curve, reorganize as wanted
 - If want to copy one mask to another, do Layer to Selection, then Add Layer Mask with "Selection" option
+
+Interesting tools:
+- Color -> Components -> Mono Mixer, Useful to create new coloring from old if the entire vehicle is shaded.
 
 How to copy paint mask to camo mask:
 Need GMM (paint) and AO (camo); generate your own if needed.

@@ -30,6 +30,7 @@ package uml
 		
 		protected var affect_hangar : CheckBox;
 		protected var target_customization : DropdownMenu;
+		protected var exclude_3D_styles: CheckBox;
 		protected var first_emblem : DropdownMenu;
 		protected var second_emblem : DropdownMenu;
 		protected var force_both_emblem : CheckBox;
@@ -96,8 +97,10 @@ package uml
 			// Dropdown list selecting: Target (player, ally, enemy); 
 			//							first_emblem, second_emblem; camo set of 3; paint set of 3
 			var help_forced_customization : LabelControl = createLabel("Force Customization", x, y);
-			this.affect_hangar = createCheckbox("Affect Hangar", x + 125, y);
-			this.target_customization = createDropdown(x + 125 + 130, y - 3);
+			this.exclude_3D_styles = createCheckbox("Ignore 3D", x + 125, y);
+			this.target_customization = createDropdown(x + 125 + 110, y - 3);
+			this.target_customization.width = 80;
+			this.affect_hangar = createCheckbox("Affect Hangar", x + 125 + 110 + 100, y);
 			var emblem_help : LabelControl = createLabel("Emblems: ", x, y + 25);
 			this.first_emblem = createDropdown(x + 95, y + 25 - 3);
 			this.second_emblem = createDropdown(x + 95 + 130, y + 25 - 3);
@@ -176,6 +179,7 @@ package uml
 			var target_dict : Object = this.forced_customization[this.target_customization.selectedIndex];
 			// DebugUtils.LOG_WARNING("debug @reloadForcedCustomization: " + App.utils.JSON.encode(target_dict));
 			this.affect_hangar.selected = this.forced_customization[0]["affectHangar"];
+			this.exclude_3D_styles.selected = target_dict["exclude3DStyle"];
 			this.first_emblem.selectedIndex = this.customization_data["decalID"].indexOf(target_dict["forcedEmblem"][0]);
 			this.second_emblem.selectedIndex = this.customization_data["sec_decalID"].indexOf(target_dict["forcedEmblem"][1]);
 			this.force_both_emblem.selected = target_dict["forcedBothEmblem"];
@@ -210,6 +214,9 @@ package uml
 				this.forced_customization[0]["affectHangar"] = this.affect_hangar.selected;
 			} else {
 				switch(e.target) {
+					case this.exclude_3D_styles:
+						target_dict["exclude3DStyle"] = this.exclude_3D_styles.selected;
+						break;
 					case this.force_both_emblem:
 						target_dict["forcedBothEmblem"] = this.force_both_emblem.selected;
 						break;

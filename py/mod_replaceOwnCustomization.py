@@ -17,7 +17,12 @@ import json
 import re
 
 TYPE_PLAYER, TYPE_ALLY, TYPE_ENEMY = "player", "ally", "enemy"
-BigWorld.forcedCustomizationDict = getattr(BigWorld, "forcedCustomizationDict", dict())
+DEFAULTDICT = {
+    TYPE_PLAYER: {"forcedEmblem": None, "forcedCamo": None, "forcedPaint": None, "forcedBothEmblem": None, "blacklist": [], "whitelist": [], "personalNumberID": 0, "personalNumber": None, "exclude3DStyle": False},
+    TYPE_ALLY: {"forcedEmblem": None, "forcedCamo": None, "forcedPaint": None, "forcedBothEmblem": None, "blacklist": [], "whitelist": [], "personalNumberID": 0, "personalNumber": None, "exclude3DStyle": False},
+    TYPE_ENEMY: {"forcedEmblem": None, "forcedCamo": None, "forcedPaint": None, "forcedBothEmblem": None, "blacklist": [], "whitelist": [], "personalNumberID": 0, "personalNumber": None, "exclude3DStyle": False}
+}
+BigWorld.forcedCustomizationDict = getattr(BigWorld, "forcedCustomizationDict", DEFAULTDICT)
 
 PERSONAL_NUMBERS_DIGIT_COUNT = {idx : item.digitsCount for idx, item in vehicles.g_cache.customization20().personal_numbers.items()}
 PERSONAL_NUMBERS_FORMAT = {2: "{:02d}", 3: "{:03d}"} # should only have these formats
@@ -155,12 +160,7 @@ def checkList(vehicleType, vehicleDescriptor):
     if vehicleType not in BigWorld.forcedCustomizationDict:
         # unloaded (these fields always have value after loads)
         if not ReplaceOwnCustomizationGUI.loadForcedCustomizationFromDisk():
-            print("Warning @replaceOwnCustomization: Neither UML nor text config detected. The mod will do nothing.")
-            BigWorld.forcedCustomizationDict = {
-                TYPE_PLAYER: {"forcedEmblem": None, "forcedCamo": None, "forcedPaint": None, "forcedBothEmblem": None, "blacklist": None, "whitelist": None, "personalNumberID": None, "personalNumber": None, "exclude3DStyle": False},
-                TYPE_ALLY: {"forcedEmblem": None, "forcedCamo": None, "forcedPaint": None, "forcedBothEmblem": None, "blacklist": None, "whitelist": None, "personalNumberID": None, "personalNumber": None, "exclude3DStyle": False},
-                TYPE_ENEMY: {"forcedEmblem": None, "forcedCamo": None, "forcedPaint": None, "forcedBothEmblem": None, "blacklist": None, "whitelist": None, "personalNumberID": None, "personalNumber": None, "exclude3DStyle": False}
-            }
+            print("[ROC] Warning @replaceOwnCustomization: Neither UML nor text config detected. The mod will do nothing for now.")
     vehicleName = vehicleDescriptor.type.name
     if not isBlank(BigWorld.forcedCustomizationDict[vehicleType].get("whitelist", None)): # WHITELIST TAKE PRECEDENCE
         # check if vehicle is in whitelist
@@ -383,6 +383,11 @@ class ReplaceOwnCustomizationGUI(AbstractWindowView):
                     BigWorld.forcedCustomizationDict.update( json.load(jf) )
                 printDebug("Finished loading JSON mode @loadForcedCustomizationFromDisk, loaded structure: {}".format(BigWorld.forcedCustomizationDict))
             else:
+                # create a defaultdict
+                BigWorld.forcedCustomizationDict = DEFAULTDICT
+                # update this defaultdict on json path
+                with io.open(json_path, "w", encoding="utf-8") as jf: # json.dump is retarded in Python2?
+                    jf.write(unicode(json.dumps(BigWorld.forcedCustomizationDict, ensure_ascii=False)))
                 return False
         # recheck to ascertain the fields are valid
         customization_cache = vehicles.g_cache.customization20()
@@ -399,7 +404,7 @@ class ReplaceOwnCustomizationGUI(AbstractWindowView):
         # update for everything
         for namespace in (TYPE_PLAYER, TYPE_ALLY, TYPE_ENEMY):
             for field, size in [("forcedEmblem", 2), ("forcedBothEmblem", None), ("exclude3DStyle", None), ("forcedCamo", 3), ("forcedPaint", 3)]:
-                if(config[namespace][field] is None): # None and 0 are functionally the same thing
+                if(config[namespace].get(field, None) is None): # None and 0 are functionally the same thing
                     config[namespace][field] = 0
                 if(isinstance(config[namespace][field], int) and size and size > 1):
                     # duplicate to help the GUI not messing up; thankfully the forcedBothEmblem is bool
@@ -448,8 +453,8 @@ class ReplaceOwnCustomizationGUI(AbstractWindowView):
                         ReplaceOwnCustomizationGUI.writeDataToSection(sectionMain, "{:s}/{:s}".format(namespace, field), value)
             sectionMain.save(); ResMgr.purge(ReplaceOwnCustomizationGUI.UML_PATH, True)
         else:
-            with io.open(ReplaceOwnCustomizationGUI.JSON_PATH, "w") as jf:
-                json.dump(customizationdata, jf)
+            with io.open(ReplaceOwnCustomizationGUI.JSON_PATH, "w", encoding="utf-8") as jf: # json.dump is retarded in Python2?
+                jf.write(unicode(json.dumps(customizationdata, ensure_ascii=False)))
         BigWorld.forcedCustomizationDict.update(customizationdata)
         
     @staticmethod

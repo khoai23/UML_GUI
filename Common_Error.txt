@@ -71,6 +71,14 @@ Use ScrollingListPx instead of ScrollingListEx;
 
 The game reload the swf after battle; so you can replace and test things quick on the flash front; simply replace the file, play a battle, and the changes will be updated.
 
+Own music module:
+C:\Python27\python.exe -m compileall py\mod_replaceOwnMusic.py
+
+The current governing music module is MusicControllerWWISE's MusicController, which create a dictionary of what music to play during event.
+__soundEvents should hold the majority of cached sounds; __overriddenEvents SHOULD be overboard those, but the code doesn't reflect that.
+Once we can leverage SoundGroups's MP3 function, we should be done for our 1st objective.
+
+
 GIMP:
 Edit separate channels by Color -> Components -> Decompose, choose RGBA, edit the other image as you please, then Recompose.
 AO map:

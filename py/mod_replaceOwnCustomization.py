@@ -18,11 +18,11 @@ import re
 
 TYPE_PLAYER, TYPE_ALLY, TYPE_ENEMY = "player", "ally", "enemy"
 DEFAULTDICT = {
-    TYPE_PLAYER: {"forcedEmblem": None, "forcedCamo": None, "forcedPaint": None, "forcedBothEmblem": None, "blacklist": [], "whitelist": [], "personalNumberID": 0, "personalNumber": None, "exclude3DStyle": False},
-    TYPE_ALLY: {"forcedEmblem": None, "forcedCamo": None, "forcedPaint": None, "forcedBothEmblem": None, "blacklist": [], "whitelist": [], "personalNumberID": 0, "personalNumber": None, "exclude3DStyle": False},
-    TYPE_ENEMY: {"forcedEmblem": None, "forcedCamo": None, "forcedPaint": None, "forcedBothEmblem": None, "blacklist": [], "whitelist": [], "personalNumberID": 0, "personalNumber": None, "exclude3DStyle": False}
+    TYPE_PLAYER: {"forcedEmblem": None, "forcedCamo": None, "forcedPaint": None, "forcedBothEmblem": None, "blacklist": None, "whitelist": None, "personalNumberID": 0, "personalNumber": None, "exclude3DStyle": False},
+    TYPE_ALLY: {"forcedEmblem": None, "forcedCamo": None, "forcedPaint": None, "forcedBothEmblem": None, "blacklist": None, "whitelist": None, "personalNumberID": 0, "personalNumber": None, "exclude3DStyle": False},
+    TYPE_ENEMY: {"forcedEmblem": None, "forcedCamo": None, "forcedPaint": None, "forcedBothEmblem": None, "blacklist": None, "whitelist": None, "personalNumberID": 0, "personalNumber": None, "exclude3DStyle": False}
 }
-BigWorld.forcedCustomizationDict = getattr(BigWorld, "forcedCustomizationDict", DEFAULTDICT)
+BigWorld.forcedCustomizationDict = getattr(BigWorld, "forcedCustomizationDict", dict())
 
 PERSONAL_NUMBERS_DIGIT_COUNT = {idx : item.digitsCount for idx, item in vehicles.g_cache.customization20().personal_numbers.items()}
 PERSONAL_NUMBERS_FORMAT = {2: "{:02d}", 3: "{:03d}"} # should only have these formats
@@ -184,10 +184,18 @@ def decomposeApplyAreaRegion(combinedRegionValue, regionList=ApplyArea.RANGE):
         return []
     return [r for r in regionList if r & combinedRegionValue]
 
+def specialCase(vehicleDescriptor):
+    # detected some special case e.g Events
+    if(vehicleDescriptor is None):
+        return False # need verify here - anywhere does vehDesc is actually none?
+    return "_TLXXL" in vehicleDescriptor.type.name # WTF100 event vehicles.
+
 def modifyOutfitComponent(outfitComponent, outfitCD=None, vehicleDescriptor=None, vehicleId=None, previousOutfit=None):
     # INJECTION HERE
     if(not outfitCD and not BigWorld.forcedCustomizationDict.get("overrideEmptyOutfit", False)):
         return outfitComponent # if the value is default (e.g dead vehicles), do not modify
+    if(specialCase(vehicleDescriptor)):
+        return outfitComponent # some special case will abort injection
     # vehicle type (player, ally, enemy) 
     if vehicleId is None:
         # vehicle call from __reload (hangar)
@@ -199,7 +207,7 @@ def modifyOutfitComponent(outfitComponent, outfitCD=None, vehicleDescriptor=None
     else:
         vehicleType = TYPE_ENEMY # is enemy vehicle (arena)
     #try:
-    #    print("Vehicle type {:s} with name {:s}".format(vehicleType, vehicleDescriptor.type.name))
+    #    print("[ROC Debug]Vehicle type {:s} with name {:s}".format(vehicleType, vehicleDescriptor.type.name))
     #except Exception as e:
     #    print("Error @modifyOutfitComponent: " + str(e))
     if not checkList(vehicleType, vehicleDescriptor):

@@ -7,10 +7,14 @@ from debug_utils import LOG_ERROR, LOG_WARNING, LOG_DEBUG
 from Avatar import PlayerAvatar
 import BigWorld, ResMgr
 
+from gui.impl.gen_utils import DynAccessor
+from gui.impl.gen.resources import R, Sounds
 """prototype concept test:
 - inject and listen to music events from https://github.com/IzeBerg/wot-src/blob/master/sources/res/scripts/client/MusicControllerWWISE.py#L202
 - use internal WWISE to build mp3 events from https://github.com/IzeBerg/wot-src/blob/master/sources/res/scripts/client/SoundGroups.py#L518
 - listen to player statistic from https://github.com/IzeBerg/wot-src/blob/master/sources/res/scripts/client/Avatar.py
+
+# apparently resources have a DynamicAccessor for virtually everything? https://github.com/IzeBerg/wot-src/blob/master/sources/res/scripts/client/gui/impl/gen/resources/__init__.py
 
 # arena sound event, called from SoundGroups
 # redundant if injecting from play
@@ -42,6 +46,25 @@ MusicController.setEventParam = new_setEventParam
 SAMPLE_MP3 = "ROM_sample"
 ROM_Available = {SAMPLE_MP3: False}
 
+def find_max_resId(node):
+    maxid = -1
+    if isinstance(node, DynAccessor):
+        maxid = max(node(), maxid)
+    for k in dir(node): # recursive down the corresponding child nodes
+        v = getattr(node, k)
+        if(k.startswith("_") or not isinstance(v, DynAccessor)):
+            # not valid subchild, skipping
+            continue
+        maxid = max(find_max_resId(v), maxid)
+    return maxid
+
+# add a valid dynamic accessor to [sounds] handle.
+# nevermind, setattr hasn't worked at all. Try to override the getattr of Sounds
+added_DA = DynAccessor(find_max_resId(R) + 1)
+setattr(Sounds, SAMPLE_MP3, added_DA)
+# Sounds.ROM_sample = added_DA
+# still isn't working for the moment.
+
 # function to run wwise's prepare event. Is identical to the ginstance version, since both cause ID not found.
 def prepareMP3(event):
     if not ResMgr.isFile('audioww/%s.mp3' % event):
@@ -51,6 +74,7 @@ def prepareMP3(event):
     return True
 
 # override loadConfig to add concerning files
+# proven to work with sixthSense already
 old__loadConfig = MusicController._MusicController__loadConfig
 def new__loadConfig(self):
     old__loadConfig(self)
@@ -74,7 +98,7 @@ def do_nothing(self, *args):
 #MusicController._MusicController__updateOverridden = do_nothing
 
 # main target - play event
-# apparently not called very often.
+# apparently not called very often. 
 old_MW_play = MusicController.play
 def new_MW_play(self, eventId, params=None, checkIsPlaying=False):
     print("Injected in MusicController's play. eventId: {}, params: {}".format(eventId, params))

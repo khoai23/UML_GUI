@@ -16,6 +16,15 @@ from gui.impl.gen.resources import R, Sounds
 
 # apparently resources have a DynamicAccessor for virtually everything? https://github.com/IzeBerg/wot-src/blob/master/sources/res/scripts/client/gui/impl/gen/resources/__init__.py
 
+# Completely useless. Seem like this section is dead code.
+from gui.sounds.sound import Sound
+# let's try override class?
+old_Sound_play = Sound.play
+def new_Sound_play(self):
+    print("[ROM] Debug: the play @Sound is called with path: {}".format(self._Sound__sndPath))
+    return old_Sound_play(self)
+Sound.play = new_Sound_play
+
 # arena sound event, called from SoundGroups
 # redundant if injecting from play
 old__onArenaStateChanged = MusicController._MusicController__onArenaStateChanged
@@ -43,7 +52,7 @@ MusicController.setEventParam = new_setEventParam
 """
 
 #SoundGroups.CUSTOM_MP3_EVENTS = tuple( list(SoundGroups.CUSTOM_MP3_EVENTS) + [SAMPLE_MP3] ) # see if soundgroups call is better?
-SAMPLE_MP3 = "ROM_sample"
+SAMPLE_MP3 = "sixthSense"
 ROM_Available = {SAMPLE_MP3: False}
 
 def find_max_resId(node):
@@ -90,6 +99,20 @@ def new__loadConfig(self):
         # print("[ROM] Debug: self.__soundEvents after change: {}".format(self._MusicController__soundEvents))
         print("[ROM] rewriten in __soundEvents {} and {} by {}".format(MUSIC_EVENT_COMBAT, MUSIC_EVENT_LOBBY, sample))
 MusicController._MusicController__loadConfig = new__loadConfig
+
+# since loadConfig version is still not operable; consider maybe prepareMP3 to be a function to reload & refresh mp3 in-game?
+# add the prepareMP3 function on play call of MusicController's MusicEvent
+# so far this doesn't work, pointing to the original issue of unable to dynamically load mp3 when needed
+old_ME_replace = MusicController.MusicEvent.replace
+def new_ME_replace(self, event, eventId, unlink=True):
+    # print("[ROM] Debug: Successfully injected into MusicEvent's replace fn.")
+    if event.name in ROM_Available.keys():
+        if(prepareMP3(event.name)):
+            print("[ROM]: Called custom prepareMP3 for existing name {:s}".format(event.name))
+    else:
+        print("[ROM]: event name {:s} is not in list of possible mp3 keys.".format(event.name))
+    return old_ME_replace(self, event, eventId, unlink=unlink)
+#MusicController.MusicEvent.replace = new_ME_replace
 
 # temporarily disable __updateOverridden to see if lobby will run the mp3 event.
 # Still happen. must be some other function.

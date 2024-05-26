@@ -3,7 +3,7 @@
 - Cannot export .visual
  -> Go to Customize -> Config System Paths -> 3rd Party Plugin -> add the /bigworld/tools/exporter/version from BigWorld 2.1
 - Not valid material link: (absolule link to .png making export failure)
- -> Rendering -> Material Editor -> Photometric/Bitmap Path -> Strip All Paths 
+ -> Rendering -> Material Explorer -> Photometric/Bitmap Path -> Strip All Paths 
 - Crash upon F5/Entering with no log
  Possible missing hardpoint (HP). Check HP_gunJoint in turret, etc.
  
@@ -42,7 +42,7 @@ Compile the python binding with compileall
 C:\Python27\python.exe -m compileall py\mod_UML_interface.py
 
 Compile the swf, with its external swc(s) are found in gui-part1/2.pkg; stand in `root` folder (you should see the `as3` folder)
-D:\Archive\flex_sdk_4.6.0.23201B\bin\mxmlc  -compiler.source-path=as3 -compiler.external-library-path+=as3\lib\common-1.0-SNAPSHOT.swc,as3\lib\gui_base-1.0-SNAPSHOT.swc -static-link-runtime-shared-libraries=true -o as3\UML_MainGUI.swf as3\uml\UML_MainGUI.as
+..\flex_sdk_4.6.0.23201B\bin\mxmlc  -compiler.source-path=as3 -compiler.external-library-path+=as3\lib\common-1.0-SNAPSHOT.swc,as3\lib\gui_base-1.0-SNAPSHOT.swc -static-link-runtime-shared-libraries=true -o as3\UML_MainGUI.swf as3\uml\UML_MainGUI.as
 ..\flex_sdk_4.6.0.23201B\bin\mxmlc.bat  -compiler.source-path=as3 -compiler.external-library-path+=as3\lib\common-1.0-SNAPSHOT.swc,as3\lib\gui_base-1.0-SNAPSHOT.swc -static-link-runtime-shared-libraries=true -o as3\UML_MainGUI.swf as3\uml\UML_MainGUI.as
 If installed in Windows 64bit, consider using the mxmlc.bat trick if encountering "Could not find JVM". Content of it should be:
 """
@@ -55,7 +55,7 @@ Those swc can also be viewed using JPEXS Free Flash Decompiler
 
 Forced customization:
 C:\Python27\python.exe -m compileall py\mod_replaceOwnCustomization.py
-D:\Archive\flex_sdk_4.6.0.23201B\bin\mxmlc  -compiler.source-path=as3 -compiler.external-library-path+=as3\lib\common-1.0-SNAPSHOT.swc,as3\lib\gui_base-1.0-SNAPSHOT.swc -static-link-runtime-shared-libraries=true -o as3\ROC_GUI.swf as3\uml\ReplaceOwnCustomizationGUI.as
+..\flex_sdk_4.6.0.23201B\bin\mxmlc  -compiler.source-path=as3 -compiler.external-library-path+=as3\lib\common-1.0-SNAPSHOT.swc,as3\lib\gui_base-1.0-SNAPSHOT.swc -static-link-runtime-shared-libraries=true -o as3\ROC_GUI.swf as3\uml\ReplaceOwnCustomizationGUI.as
 Additionally, to pack into independent .wotmod (not updated)
 py pyc_to_wotmod.py py\mod_replaceOwnCustomization.py as3\ROC_GUI.swf ReplaceOwnCustomization.wotmod
 
@@ -89,7 +89,7 @@ AO map:
 
 GMM map:
 - R is smooth/gloss map - white will be more reflective (white is glass-like)
-- G is metallic map - white will look more like bare metal
+- G is metallic map - white will be overlaid gray over other camo/paint map. Useful to add more scratch/wear details. Should be used in conjunction with R channel
 - B is paint exclusion map. Black will not receive paint
 
 How to do fading:
@@ -99,8 +99,14 @@ How to do fading:
 - Color -> Curve, reorganize as wanted
 - If want to copy one mask to another, do Layer to Selection, then Add Layer Mask with "Selection" option
 
+How to extract camo/paint mask from single-colored texture (diffuse):
+- Color to Alpha, select the color so it's gone
+- Color -> Components -> Extract Component -> Alpha
+- Invert the value (so the white is paint overlaid over the colored texture)
+- Rescale coloring range if needed
+
 Interesting tools:
-- Color -> Components -> Mono Mixer, Useful to create new coloring from old if the entire vehicle is shaded.
+- Color -> Components -> Mono Mixer, Useful to create new coloring from old if the texture is single-colored.
 
 How to copy paint mask to camo mask:
 Need GMM (paint) and AO (camo); generate your own if needed.
@@ -115,10 +121,14 @@ Vietnam sticker: 410 is flag, 38 is armored flag
 Prefered camos:
 513, 512, 514 (large spots); 555, 554, 556 (7th aniv); 634, 635, 636 (Expeditionary)
 	Summer independent: 638 (Homeland), 660 (1st Guard), 576 (Fire Bulge), 645 (Let's celebrate), 90 (Mil. Korean)
-	Winter independent: 635 (Glass), 623 (Alfa), 622 (Btl Moscow), 598 (Hunt Silver), 560 (Western Front), 302 (Polar Bear), 382 (Rain of Stone)
+	Winter independent: 635 (Glass), 623 (Alfa), 622 (Btl Moscow), 598 (Hunt Silver), 560 (Western Front), 302 (Polar Bear), 382 (Rain of Stone), 345 (Prot. 027)
 	Desert independent: 618 (Thanksgiving), 553 (Four tone floral), 299 (Lancelot), 183 (Char de Carton), 312 (Southern Wind)
 	Interesting texture (relies on paint): 387 (Black Marble)
 	
 Base density for models should be 1 1
 	
 Powerpoint Mac PList: Library\Preferences\com.microsoft.Powerpoint.plist
+
+V node is for building the chassis hull; we can separate the wheels/tracks node to another one and it will works fine.
+V_BlendBone is the upper bone for track; the other one is the lower bone; adjust accordingly.
+WD are for controlling the sprocket wheels; while W are for road wheels.

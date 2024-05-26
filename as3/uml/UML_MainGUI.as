@@ -73,6 +73,16 @@ package uml
 	  public var current_profile_style_help : LabelControl;
 	  public var current_profile_configString : TextInput;
 	  public var current_profile_configString_help : LabelControl;
+	  
+	  public var current_profile_gunEffect : TextInput;
+	  public var current_profile_gunEffect_help : LabelControl;
+	  public var current_profile_soundChassis : TextInput;
+	  public var current_profile_soundChassis_help : LabelControl;
+	  public var current_profile_soundTurret : TextInput;
+	  public var current_profile_soundTurret_help : LabelControl;
+	  public var current_profile_soundEngine : TextInput;
+	  public var current_profile_soundEngine_help : LabelControl;
+	  
 	  public var delete_profile : SoundButtonEx;
 	  public var use_hangar_vehicle : SoundButtonEx;
 	  
@@ -140,21 +150,23 @@ package uml
 	  protected var list_styles : Array = null;
 	  protected var list_hybrid_parts_styles : Array = [new Array(), new Array(), new Array()];
 	  protected var customization_data : Object;
+	  protected var localization_data: Object;
 	  
-	  public var getIsDebugUMLFromPy : Function = null; // this will get UML's debug to decide showing debug fields (eval, exec) or not
-	  public var forcedCustomizationIsAvailableAtPy : Function = null; // this will check if forcedCustomization module exist or not
-      public var receiveStringConfigAtPy : Function = null; // this will receive config data from swf to python
-	  public var getStringConfigFromPy : Function = null;	// this will get config data from python to swf
-	  public var getVehicleSelectorDataFromPy : Function = null; // this will get permanent vehicle categories (nation, class, tier)
-	  public var loadVehiclesWithCriteriaFromPy : Function = null; // this will load the list of vehicles fitting the filter above
-	  public var loadVehicleProfileFromPy : Function = null;	  // this will convert the proper name into the accompanying text input
-	  public var removeProfileAtPy : Function = null; // this will purge the profile on Python / XML end
-	  public var loadCustomizationDataFromPy : Function = null; // this will load the needed data to camo/paint dropdown
-	  public var getHangarVehicleFromPy : Function = null; // this will retrieve the needed hangar vehicle to support addHangarVehicleToWhitelist
-	  public var getPossibleStyleOfProfileFromPy : Function = null; // this will retrieve the needed profile style from the vehicle obj.
-	  public var debugEvalCommand : Function = null; // eval and exec codes directly from GUI
-	  public var checkIsValidWoTVehicleAtPy : Function = null // check valid code to create hybrids
-	  public var getValidKeyBindFromPy: Function = null // list keybinds that are available on UML.
+	  public var getIsDebugUMLFromPy : Function = null; 				// this will get UML's debug to decide showing debug fields (eval, exec) or not
+	  public var forcedCustomizationIsAvailableAtPy : Function = null; 	// this will check if forcedCustomization module exist or not
+      public var receiveStringConfigAtPy : Function = null; 			// this will receive config data from swf to python
+	  public var getStringConfigFromPy : Function = null;				// this will get config data from python to swf
+	  public var getVehicleSelectorDataFromPy : Function = null; 		// this will get permanent vehicle categories (nation, class, tier)
+	  public var loadVehiclesWithCriteriaFromPy : Function = null; 		// this will load the list of vehicles fitting the filter above
+	  public var loadVehicleProfileFromPy : Function = null;			// this will convert the proper name into the accompanying text input
+	  public var removeProfileAtPy : Function = null; 					// this will purge the profile on Python / XML end
+	  public var loadCustomizationDataFromPy : Function = null; 		// this will load the needed data to camo/paint dropdown
+	  public var getHangarVehicleFromPy : Function = null; 				// this will retrieve the needed hangar vehicle to support addHangarVehicleToWhitelist
+	  public var getPossibleStyleOfProfileFromPy : Function = null; 	// this will retrieve the needed profile style from the vehicle obj.
+	  public var debugEvalCommand : Function = null; 					// eval and exec codes directly from GUI
+	  public var checkIsValidWoTVehicleAtPy : Function = null; 			// check valid code to create hybrids
+	  public var getValidKeyBindFromPy: Function = null; 				// list keybinds that are available on UML.
+	  public var getStringLocalizationFromPy: Function = null;			// retrieve localizable dict to use 
 
 	  public function UML_MainGUI() {
 		 super();
@@ -162,22 +174,24 @@ package uml
 	  
 	  override protected function onPopulate() : void {
 		 super.onPopulate();
+		 this.localization_data = App.utils.JSON.decode(this.getStringLocalizationFromPy());
 		 
 		 this.moe_selector = createDropdown(35, 10 - 3);
-		 this.moe_selector.dataProvider = new DataProvider(["Default MOE", "No MOE", "1 MOE", "2 MOE", "3 MOE"]);
-		 var moe_help_1 : LabelControl = createLabel("applied to: ", 35 + 135, 10);
+		 this.moe_selector.dataProvider = new DataProvider(retrieveLocalized("moe_options", ["Default MOE", "No MOE", "1 MOE", "2 MOE", "3 MOE"]) as Array);
+		 var moe_help_1 : LabelControl = createLabel("moe_list_desc", 35 + 135, 10);
+		 // this.moe_list = createTextInput("moe_list_placeholder", 35 + 195, 10 - 3);
 		 this.moe_list = createTextInput("moe_list_placeholder", 35 + 195, 10 - 3);
-		 this.add_profile_to_moe_btn = createButton("From Selector", 35 + 330, 10, true);
+		 this.add_profile_to_moe_btn = createButton("add_profile_to_moe_desc", 35 + 330, 10, true);
 		 var moe_help_2 : LabelControl = createLabel("using texture: ", 35 + 330 + 95, 10);
 		 this.moe_nation = createDropdown(35 + 330 + 95 + 85 , 10 - 3);
 		 this.moe_nation.dataProvider = new DataProvider(["Default"]);
 		 this.moe_nation.selectedIndex = 0;
 		 this.moe_nation.enabled = false;
 		 
-		 this.affect_hangar = createCheckbox("View UML in Hangar", 35, 35);
-		 this.use_UML_sound = createCheckbox("Use UML sounds", 200, 35);
+		 this.affect_hangar = createCheckbox("affect_hangar_desc", 35, 35);
+		 this.use_UML_sound = createCheckbox("use_uml_sound_desc", 200, 35);
 		 
-		this.remodels_filelist_label = createLabel("Base Remodel files:", 325, 35);
+		this.remodels_filelist_label = createLabel("remodels_filelist_desc", 325, 35);
 		this.remodels_filelist_label.width = 175;
 		this.remodels_filelist = createTextInput("remodel_filelist_placeholder", 430, 30);
 		
@@ -196,8 +210,8 @@ package uml
 			this.debug_btn.addEventListener(ButtonEvent.CLICK, this.sendDebugCmdFromAS);
 		}
 
-		this.apply_button = createButton("Apply", this.width - 200, this.height - 35);
-		this.reload_button = createButton("Reload", this.width - 385, this.height - 35);
+		this.apply_button = createButton("apply_btn", this.width - 200, this.height - 35);
+		this.reload_button = createButton("reload_btn", this.width - 385, this.height - 35);
 		this.apply_button.addEventListener(ButtonEvent.CLICK, this.sendStringConfigFromAS);
 		this.reload_button.addEventListener(ButtonEvent.CLICK, this.setStringConfigToAS);
 		// bind to MOE button above.
@@ -210,70 +224,83 @@ package uml
 	  internal function createProfileList(x: Number, y: Number) : Object {
 		// try to create a profile list
 		// TODO properly lock the values to currentX and currentY
-		var currentX : Number = x;
-		var currentY : Number = y;
+		var currentX : Number = x; // should be 35
+		var currentY : Number = y; // should be 65
+		var sectionX : Number = x;
+		var sectionY : Number = y;
 		if(this.isStatic) {
 			// button for forward/backward around the profile selector
-			this.backward_btn = createButton("<", 35, 65, true);
-			this.forward_btn = createButton(">", 205, 65, true);
-			
+			this.backward_btn = createButton("<", currentX, currentY, true);
 			// menu to select profile to edit
-			//this.profile_selector = this.addChild(App.utils.classFactory.getComponent("DropdownMenuUI", DropdownMenu, 
-			//		{ "x": 65, "y": 62, "itemRenderer": App.utils.classFactory.getClass("DropDownListItemRendererSound")})) as DropdownMenu
-			//this.profile_selector.dropdown = "DropdownMenu_ScrollingList";
-			this.profile_selector = this.createDropdown(65, 65 - 3)
+			this.profile_selector = this.createDropdown(currentX + 30, currentY - 3);
+			this.forward_btn = createButton(">", currentX + 170, currentY, true);
+			
 			// ignore list
-			this.toggle_show_ignore = createCheckbox("Show ignored profiles", 235, 65);
+			this.toggle_show_ignore = createCheckbox("toggle_show_ignore_desc", currentX + 200, currentY);
 			//this.profile_selector.dataProvider = new DataProvider(["option1", "option2"]);
 			
+			// section is moved downward 2 spaces (20) to 105
+			sectionX = currentX; sectionY = currentY + 40;
 			// format: profile name (label) - enable - whitelist
 			//this.profile_selector.dataProvider.invalidate();
-			this.current_profile_name = createTextInput("profile_placeholder", 35, 102);
+			this.current_profile_name = createTextInput("profile_placeholder", sectionX, sectionY - 3);
 			this.current_profile_name.editable = false;
 			this.current_profile_name.width = 220;
-			this.current_profile_ignore = createCheckbox("Ignore by GUI", 35 + 225, 105);
+			this.current_profile_ignore = createCheckbox("current_profile_ignore_desc", sectionX + 225, sectionY);
 			// this.current_profile_name.autoSize = TextFieldAutoSize.LEFT;
 			// this.current_profile_name.toolTip = "The full name of the profile.";
-			this.current_profile_target_help = createLabel("Enabled profiles:", 35 + 125, 105 + 20);
-			this.current_profile_target = createTextInput("whitelist_placeholder", 35 + 225, 105 + 20 - 3);
-			this.current_profile_enable = createCheckbox("Enabled", 35, 105 + 20);
-			this.current_profile_swapNPC = createCheckbox("Model swap NPC", 35, 105 + 40);
-			this.current_profile_alignToTurret = createCheckbox("Align to Turret", 35, 105 + 60);
+			this.current_profile_target_help = createLabel("current_profile_target_desc", sectionX + 125, sectionY + 20);
+			this.current_profile_target = createTextInput("whitelist_placeholder", sectionX + 225, sectionY + 20 - 3);
+			this.current_profile_enable = createCheckbox("current_profile_enable_desc", sectionX, sectionY + 20);
+			this.current_profile_swapNPC = createCheckbox("current_profile_swapNPC_desc", sectionX, sectionY + 40);
+			this.current_profile_alignToTurret = createCheckbox("current_profile_alignToTurret_desc", sectionX, sectionY + 60);
 
-			this.current_profile_camo_help = createLabel("Camouflage ID:", 35 + 125, 105 + 40);
-			this.current_profile_camo = createDropdown(35 + 225, 105 + 40 - 3);
+			this.current_profile_camo_help = createLabel("current_profile_camo_desc", sectionX + 125, sectionY + 40);
+			this.current_profile_camo = createDropdown(sectionX + 225, sectionY + 40 - 3);
 			this.current_profile_camo.width = 180;
-			this.current_profile_paint_help = createLabel("Paint ID:", 35 + 125, 105 + 60);
-			this.current_profile_paint = createDropdown(35 + 225, 105 + 60 - 3);
+			this.current_profile_paint_help = createLabel("current_profile_paint_desc", sectionX + 125, sectionY + 60);
+			this.current_profile_paint = createDropdown(sectionX + 225, sectionY + 60 - 3);
 			this.current_profile_paint.width = 180;
 
-			this.current_profile_configString_help = createLabel("Config:", 35, 105 + 80)
-			this.current_profile_configString = createTextInput("N/A", 35 + 50, 105 + 80 - 3);
+			this.current_profile_configString_help = createLabel("current_profile_configString_desc", sectionX, sectionY + 80)
+			this.current_profile_configString = createTextInput("N/A", sectionX + 50, sectionY + 80 - 3);
 			this.current_profile_configString.width = 60; this.current_profile_configString.maxChars = 4;
-			this.current_profile_style_help = createLabel("(Progress) Style:", 35 + 125, 105 + 80);
-			this.current_profile_style_progression = createTextInput("4", 35 + 225, 105 + 80 - 3);
+			this.current_profile_style_help = createLabel("current_profile_style_progression_desc", sectionX + 125, sectionY + 80);
+			this.current_profile_style_progression = createTextInput("4", sectionX + 225, sectionY + 80 - 3);
 			this.current_profile_style_progression.width = 30; this.current_profile_style_progression.maxChars = 1; this.current_profile_style_progression.enabled = false;
-			this.current_profile_style = createDropdown(35 + 225 + 35, 105 + 80 - 3);
-			this.use_hangar_vehicle = createButton("Add hangar vehicle to Whitelist", 35 + 20, 105 + 105, true);
-			this.delete_profile = createButton("Delete this Profile", 35 + 230, 105 + 105, true);
+			this.current_profile_style = createDropdown(sectionX + 225 + 35, sectionY + 80 - 3);
+			
+			this.current_profile_gunEffect_help = createLabel("current_profile_gunEffect_desc", sectionX, sectionY + 100 );
+			this.current_profile_gunEffect = createTextInput("", sectionX + 105, sectionY + 100 - 3); this.current_profile_gunEffect.width = 105;
+			this.current_profile_soundTurret_help = createLabel("current_profile_soundTurret_desc", sectionX + 215, sectionY + 100);
+			this.current_profile_soundTurret = createTextInput("", sectionX + 215 + 105, sectionY + 100 - 3); this.current_profile_soundTurret.width = 105;
+			this.current_profile_soundChassis_help = createLabel("current_profile_soundChassis_desc", sectionX, sectionY + 120);
+			this.current_profile_soundChassis = createTextInput("", sectionX + 105, sectionY + 120 - 3); this.current_profile_soundChassis.width = 105;
+			this.current_profile_soundEngine_help = createLabel("current_profile_soundEngine_desc", sectionX + 215, sectionY + 120);
+			this.current_profile_soundEngine = createTextInput("", sectionX+ 215 + 105, sectionY + 120 - 3); this.current_profile_soundEngine.width = 105;
+			// +5 for comfortable margin of button
+			this.use_hangar_vehicle = createButton("use_hangar_vehicle_btn", sectionX + 20, sectionY + 145, true);
+			this.delete_profile = createButton("delete_profile_btn", sectionX + 230, sectionY + 145, true);
 			this.populatePaintCamo();
 			
-			this.hybrid_help = createLabel("Hybrid Vehicle Configuration", 35, 235)
-			this.profile_chassis_help = createLabel("Chassis:", 35, 235 + 20);
-			this.profile_chassis = createTextInput("N/A", 35 + 50, 235 + 20 - 3);
-			this.profile_chassis_style = createDropdown(35, 235 + 40 - 3); this.profile_chassis_style.width = 120;
-			this.profile_hull_help = createLabel("Hull:", 35 + 215, 235 + 20);
-			this.profile_hull = createTextInput("N/A", 35 + 215 + 35, 235 + 20 - 3);
-			this.profile_hull_style = createDropdown(35 + 215, 235 + 40 - 3); this.profile_hull_style.width = 120;
-			this.profile_hull_from_selector = createButton("From Selector", 35 + 215 + 120, 235 + 40, true);
-			this.profile_turret_help = createLabel("Turret:", 35, 235 + 60);
-			this.profile_turret = createTextInput("N/A", 35 + 50, 235 + 60 - 3);
-			this.profile_turret_style = createDropdown(35, 235 + 80 - 3); this.profile_turret_style.width = 120;
-			this.profile_turret_from_selector = createButton("From Selector", 35 + 120, 235 + 80, true);
-			this.profile_gun_help = createLabel("Gun:", 35 + 215, 235 + 60);
-			this.profile_gun = createTextInput("N/A", 35 + 215 + 35, 235 + 60 - 3);
-			this.profile_gun_style = createDropdown(35 + 215, 235 + 80 - 3); this.profile_gun_style.width = 120;
-			this.profile_gun_from_selector = createButton("From Selector", 35 + 215 + 120, 235 + 80, true);
+			// section is moved downward 8+ spaces (170) to 380
+			sectionX = currentX; sectionY = sectionY + 170;
+			this.hybrid_help = createLabel("hybrid_desc", sectionX, sectionY)
+			this.profile_chassis_help = createLabel("profile_chassis_desc", sectionX, sectionY + 20);
+			this.profile_chassis = createTextInput("N/A", sectionX + 50, sectionY + 20 - 3);
+			this.profile_chassis_style = createDropdown(sectionX, sectionY + 40 - 3); this.profile_chassis_style.width = 120;
+			this.profile_hull_help = createLabel("profile_hull_desc", sectionX + 215, sectionY + 20);
+			this.profile_hull = createTextInput("N/A", sectionX + 215 + sectionX, sectionY + 20 - 3);
+			this.profile_hull_style = createDropdown(sectionX + 215, sectionY + 40 - 3); this.profile_hull_style.width = 120;
+			this.profile_hull_from_selector = createButton("profile_hull_from_selector_desc", sectionX + 215 + 120, sectionY + 40, true);
+			this.profile_turret_help = createLabel("profile_turret_desc", sectionX, sectionY + 60);
+			this.profile_turret = createTextInput("N/A", sectionX + 50, sectionY + 60 - 3);
+			this.profile_turret_style = createDropdown(sectionX, sectionY + 80 - 3); this.profile_turret_style.width = 120;
+			this.profile_turret_from_selector = createButton("profile_turret_from_selector_desc", sectionX + 120, sectionY + 80, true);
+			this.profile_gun_help = createLabel("profile_gun_desc", sectionX + 215, sectionY + 60);
+			this.profile_gun = createTextInput("N/A", sectionX + 215 + sectionX, sectionY + 60 - 3);
+			this.profile_gun_style = createDropdown(sectionX + 215, sectionY + 80 - 3); this.profile_gun_style.width = 120;
+			this.profile_gun_from_selector = createButton("profile_gun_from_selector_desc", sectionX + 215 + 120, sectionY + 80, true);
 			this.profile_chassis.enabled = false;
 
 			// adding appropriate listeners
@@ -293,6 +320,12 @@ package uml
 			this.current_profile_style.addEventListener(ListEvent.INDEX_CHANGE, this.onStyleChange);
 			this.current_profile_style_progression.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onProgressionChange);
 			this.current_profile_configString.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onConfigStringChange);
+			
+			this.current_profile_gunEffect.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onEffectChange);
+			this.current_profile_soundTurret.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onEffectChange);
+			this.current_profile_soundChassis.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onEffectChange);
+			this.current_profile_soundEngine.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onEffectChange);
+			
 			this.delete_profile.addEventListener(ButtonEvent.CLICK, this.removeProfile);
 			this.use_hangar_vehicle.addEventListener(ButtonEvent.CLICK, this.addHangarVehicleToWhitelist);
 
@@ -308,7 +341,7 @@ package uml
 			this.profile_gun_style.addEventListener(ListEvent.INDEX_CHANGE, this.onStyleChange);
 			// 
 			currentX = x + 425; // 460
-			currentY = y + 305; // 350
+			currentY = y + 380; // 415
 			
 			// adding the concerning VehicleSelector panel
 			var altCurrentY : Number = y;
@@ -332,9 +365,9 @@ package uml
 	  internal function populatePaintCamo() : void {
 		this.customization_data = this.loadCustomizationDataFromPy();
 		// update with Remove & No change (-1, 0)
-		this.customization_data["camoName"].unshift("Remove", "No change");
-		this.customization_data["paintName"].unshift("Remove", "No change");
-		this.customization_data["decalName"].unshift("Remove", "No change");
+		this.customization_data["camoName"].unshift(retrieveLocalizedString("camo_remove_option", "camo_remove_option"), retrieveLocalizedString("camo_no_change_option", "camo_no_change_option"));
+		this.customization_data["paintName"].unshift(retrieveLocalizedString("paint_remove_option", "paint_remove_option"), retrieveLocalizedString("paint_no_change_option", "paint_no_change_option"));
+		this.customization_data["decalName"].unshift(retrieveLocalizedString("decal_remove_option", "decal_remove_option"), retrieveLocalizedString("decal_no_change_option", "decal_no_change_option"));
 		this.customization_data["camoID"].unshift(-1, 0);
 		this.customization_data["paintID"].unshift(-1, 0);
 		this.customization_data["decalID"].unshift(-1, 0);
@@ -349,17 +382,17 @@ package uml
 	  
 	  internal function createVehicleSelector(x: Number, y: Number) : Object {
 		// multiple dropdown list concerning nation-class-tier-vehicle to show the corresponding profile name
-		this.help_vehicle_selector = createLabel("Vehicle Selector", x, y);
+		this.help_vehicle_selector = createLabel("vehicle_selector_desc", x, y);
 		this.vehicle_nations = createDropdown(x, y + 20);
 		this.vehicle_type = createDropdown(x + 135, y + 20);
 		this.vehicle_tier = createDropdown(x, y + 45);
 		this.vehicle_selector = createDropdown(x + 135, y + 45);
 		this.vehicle_profile_field = createTextInput("vehicle_profile_name", x + 60, y + 70);
 		// button to add to the profile list or whitelist.
-		this.add_profile_btn = createButton("Add as new Profile", x + 15, y + 95, true);
-		this.add_whitelist_btn = createButton("Add to Whitelist", x + 15 + 135, y + 95, true);
+		this.add_profile_btn = createButton("add_profile_btn", x + 15, y + 95, true);
+		this.add_whitelist_btn = createButton("add_whitelist_btn", x + 15 + 135, y + 95, true);
 		// button to add as a new profile
-		this.add_profile_as_parent_btn = createButton("Add as Parent to ", x + 20, y + 120, true);
+		this.add_profile_as_parent_btn = createButton("add_profile_as_parent_btn", x + 20, y + 120, true);
 		this.profile_with_parent_field = createTextInput("profile_with_parent_placeholder", x + 135, y + 120 - 2);
 		
 		var vsdata : Object = this.getVehicleSelectorDataFromPy();
@@ -386,20 +419,20 @@ package uml
 	  
 	  internal function createAdditionalSettings(x: Number, y: Number): Number {
 		// these don't need listener, since they are strictly updated on Apply anyway. Except the add button.
-		var additional_setting_help : LabelControl = createLabel("Additional Settings", x, y);
-		this.remove_3d_style = createCheckbox("Remove all 3D Styles", x, y + 20);
-		this.remove_unhistorical = createCheckbox("Remove Non-historical (incl. replays)", x + 150, y + 20);
-		this.remove_clan_logo = createCheckbox("Remove Clan Logo", x, y + 40);
-		var force_clan_logo_help : LabelControl = createLabel("Clan ID:", x + 150, y + 40);
+		var additional_setting_help : LabelControl = createLabel("additional_setting_desc", x, y);
+		this.remove_3d_style = createCheckbox("remove_3d_style_desc", x, y + 20);
+		this.remove_unhistorical = createCheckbox("remove_unhistorical_desc", x + 150, y + 20);
+		this.remove_clan_logo = createCheckbox("remove_clan_logo_desc", x, y + 40);
+		var force_clan_logo_help : LabelControl = createLabel("force_clan_logo_desc", x + 150, y + 40);
 		this.force_clan_logo = createTextInput("N/A", x + 210, y + 40 - 3); this.force_clan_logo.width = 75; this.force_clan_logo.enabled = false;
-		this.swap_friendly_enable = createCheckbox("Swap ALL friendly vehicles", x, y + 60); this.swap_friendly_enable.width = 200;
-		var swap_friendly_help : LabelControl = createLabel("Using:", x, y + 80);
+		this.swap_friendly_enable = createCheckbox("swap_friendly_enable_desc", x, y + 60); this.swap_friendly_enable.width = 200;
+		var swap_friendly_help : LabelControl = createLabel("swap_friendly_desc", x, y + 80);
 		this.swap_friendly = createTextInput("swap_friendly_placeholder", x + 40, y + 80 - 3);
-		this.add_profile_friendly = createButton("Add current Profile", x + 180, y + 80, true);
-		this.swap_enemy_enable = createCheckbox("Swap ALL enemy vehicles", x, y + 100); this.swap_enemy_enable.width = 200;
-		var swap_enemy_help : LabelControl = createLabel("Using:", x, y + 120);
+		this.add_profile_friendly = createButton("add_profile_friendly_desc", x + 180, y + 80, true);
+		this.swap_enemy_enable = createCheckbox("swap_enemy_enable_desc", x, y + 100); this.swap_enemy_enable.width = 200;
+		var swap_enemy_help : LabelControl = createLabel("swap_enemy_desc", x, y + 120);
 		this.swap_enemy = createTextInput("swap_enemy_placeholder", x + 40, y + 120 - 3);
-		this.add_profile_enemy = createButton("Add current Profile", x + 180, y + 120, true);
+		this.add_profile_enemy = createButton("add_profile_enemy_desc", x + 180, y + 120, true);
 		
 		this.add_profile_friendly.addEventListener(ButtonEvent.CLICK, this.addCurrentProfileToSwapList);
 		this.add_profile_enemy.addEventListener(ButtonEvent.CLICK, this.addCurrentProfileToSwapList);
@@ -432,6 +465,11 @@ package uml
 		    this.current_profile_camo.removeEventListener(ListEvent.INDEX_CHANGE, this.onCamoChange);
 		    this.current_profile_paint.removeEventListener(ListEvent.INDEX_CHANGE, this.onPaintChange);
 			this.current_profile_style_progression.removeEventListener(FocusHandlerEvent.FOCUS_OUT, this.onProgressionChange);
+			
+			this.current_profile_gunEffect.removeEventListener(FocusHandlerEvent.FOCUS_OUT, this.onEffectChange);
+			this.current_profile_soundTurret.removeEventListener(FocusHandlerEvent.FOCUS_OUT, this.onEffectChange);
+			this.current_profile_soundChassis.removeEventListener(FocusHandlerEvent.FOCUS_OUT, this.onEffectChange);
+			this.current_profile_soundEngine.removeEventListener(FocusHandlerEvent.FOCUS_OUT, this.onEffectChange);
 			
 			this.vehicle_nations.removeEventListener(ListEvent.INDEX_CHANGE, this.loadVehiclesWithCriteriaToAS);
 			this.vehicle_type.removeEventListener(ListEvent.INDEX_CHANGE, this.loadVehiclesWithCriteriaToAS);
@@ -504,6 +542,19 @@ package uml
 		}
 	  }
 	  
+	  internal function loadPairedValues(field : TextInput, firstval : String, secondval : String, separator : String = "|") : void {
+		// load paired values for PC/NPC and gunEffect/gunReload.
+		if(firstval != "" || secondval != "") {
+			if(firstval == secondval) {
+				field.text = firstval; // duplicate value, display only one
+			} else {
+				field.text = firstval + separator + secondval; // non-duplicate, display both separatedly
+			}
+		} else {
+			field.text = "N/A"; // both field not exist, display invalid
+		}
+	  }
+	  
 	  internal function loadProfileAtCurrentIndex() : void {
 	    var current_idx : Number = this.profile_selector.selectedIndex;
 		// if topmost, disable backward; if at end, disable forward
@@ -546,6 +597,10 @@ package uml
 			this.current_profile_configString.enabled = false;
 			this.current_profile_configString.text = "N/A";
 		}
+		loadPairedValues(this.current_profile_gunEffect, currentProfile["effectsGun"], currentProfile["effectsReload"]);
+		this.current_profile_soundTurret.text = (currentProfile["soundTurret"] == "") ? "N/A" : currentProfile["soundTurret"];
+		loadPairedValues(this.current_profile_soundChassis, currentProfile["soundChassisPC"], currentProfile["soundChassisNPC"]);
+		loadPairedValues(this.current_profile_soundEngine, currentProfile["soundEnginePC"], currentProfile["soundEngineNPC"]);
 	  }
 	  
 	  internal function onSetEnableProfile() : void {
@@ -664,10 +719,39 @@ package uml
 		}
 	  }
 	  
+	  internal function onEffectChange(event : Object, actual_target : DropdownMenu = null, separator : String="|") : void {
+		var current_profile : Object = this.list_profile_objects[this.profile_selector.selectedIndex];
+		var effect_object : TextInput = (actual_target ? actual_target : event.target) as TextInput; 
+		var firstTarget : String, secondTarget: String;
+		switch (effect_object) {
+			case this.current_profile_soundTurret: // only one field, escape
+				current_profile["soundTurret"] = effect_object.text;
+				return;
+			case this.current_profile_gunEffect:
+				firstTarget = "effectsGun", secondTarget = "effectsReload";
+				break;
+			case this.current_profile_soundChassis:
+				firstTarget = "soundChassisPC", secondTarget = "soundChassisNPC";
+				break;
+			case this.current_profile_soundEngine:
+				firstTarget = "soundEnginePC", secondTarget = "soundEngineNPC";
+				break;
+		}
+		if(effect_object.text == "N/A") {
+			current_profile[firstTarget] = ""; current_profile[secondTarget] = ""; // nothing
+		} else if(effect_object.text.indexOf(separator) >= 0) {
+			var splitted : Array = effect_object.text.split(separator); // splitted version
+			current_profile[firstTarget] = splitted[0]; current_profile[secondTarget] = splitted[1];
+		} else { // combined version (both are the same)
+			current_profile[firstTarget] = effect_object.text;
+			current_profile[secondTarget] = effect_object.text;
+		}
+	  }
+	  
 	  internal function loadVehiclesWithCriteriaToAS() : void {
 		// attempt to load vehicles using nation, type and tier filtering
 		var vehicles_data : Array = this.loadVehiclesWithCriteriaFromPy(this.vehicle_nations.selectedIndex, this.vehicle_type.selectedIndex, this.vehicle_tier.selectedIndex);
-		DebugUtils.LOG_WARNING("[UML GUI][AS] Debug: vehicle data received: " + App.utils.JSON.encode(vehicles_data) + ". Check to see what failed.");
+		// DebugUtils.LOG_WARNING("[UML GUI][AS] Debug: vehicle data received: " + App.utils.JSON.encode(vehicles_data) + ". Check to see what failed.");
 		this.vehicle_selector_profiles = vehicles_data[0];
 		this.vehicle_selector.dataProvider = new DataProvider(vehicles_data[1]);
 		this.vehicle_selector.selectedIndex = 0;
@@ -720,7 +804,7 @@ package uml
 		if(true_remove_index < 0) {
 			DebugUtils.LOG_WARNING("[UML GUI][AS] Issue: the list_all_profile_objects do not contain profile with name " + remove_profile_name + ". Skipping deletion.");
 		} else {
-			DebugUtils.LOG_WARNING("[UML GUI][AS] Debug: targetting " + remove_profile_name + " in-field index [" + String(remove_index) + "] true index [" + String(true_remove_index) + "].");
+			DebugUtils.LOG_DEBUG("[UML GUI][AS] Debug: targetting " + remove_profile_name + " in-field index [" + String(remove_index) + "] true index [" + String(true_remove_index) + "].");
 			this.list_all_profile_objects.splice(true_remove_index, 1);
 		}
 		// DebugUtils.LOG_WARNING("[UML GUI] debug selected index"
@@ -956,11 +1040,11 @@ package uml
 	  }
 	  
 	  internal function createCheckbox(label: String, x: Number, y: Number) : CheckBox {
-		return addChild(App.utils.classFactory.getComponent("CheckBox", CheckBox, { "x": x, "y": y, "label": label, "selected": false })) as CheckBox;
+		return addChild(App.utils.classFactory.getComponent("CheckBox", CheckBox, { "x": x, "y": y, "label": retrieveLocalizedString(label, label), "selected": false })) as CheckBox;
 	  }
 	  
 	  internal function createButton(label: String, x: Number, y: Number, dynamicSizeByText: Boolean = false) : SoundButtonEx {
-		return addChild(App.utils.classFactory.getComponent("ButtonNormal", SoundButtonEx, { "x": x, "y": y, "label": label,
+		return addChild(App.utils.classFactory.getComponent("ButtonNormal", SoundButtonEx, { "x": x, "y": y, "label": retrieveLocalizedString(label, label),
 				"dynamicSizeByText": dynamicSizeByText })) as SoundButtonEx;
 	  }
 	  
@@ -971,7 +1055,7 @@ package uml
 	  }
 	  
 	  internal function createLabel(lbltext: String, x: Number, y: Number) : LabelControl {
-		return addChild(App.utils.classFactory.getComponent("LabelControl", LabelControl, { "x": x, "y": y, "autoSize": true, "text": lbltext })) as LabelControl;
+		return addChild(App.utils.classFactory.getComponent("LabelControl", LabelControl, { "x": x, "y": y, "autoSize": true, "text": retrieveLocalizedString(lbltext, lbltext) })) as LabelControl;
 	  }
 	  
 	  internal function createDropdown(x: Number, y: Number) : DropdownMenu {
@@ -980,5 +1064,42 @@ package uml
 		dropdown.dropdown = "DropdownMenu_ScrollingList";
 		return dropdown
 	  }
+	  
+	  internal function retrieveLocalized(cue: String, default_: Object) : Object {
+		// try to search for cue; if not exist, output default_str
+		if(!(cue in this.localization_data)) {
+			DebugUtils.LOG_WARNING("[UML GUI][AS] Cannot find localization for `" + cue + "`. Will use default: " + default_ + ".");
+			return default_;
+		}
+		return this.localization_data[cue];
+	  }
+	  
+	  internal function retrieveLocalizedString(cue: String, default_: String): String {
+		return retrieveLocalized(cue, default_) as String;
+	  }
+	  
+	  internal function updateText(item_name: String, lbltext: String, item_type: String) : Boolean  {
+		if(!(item_name in this)) {
+			DebugUtils.LOG_WARNING("[UML GUI][AS] Cannot find item `" + item_name + "`. Check if it's a correct property.");
+			return false;
+		}
+		switch(item_type) {
+			case "button":
+				var correct_button : SoundButtonEx = this[item_name] as SoundButtonEx;
+				correct_button.label = lbltext;
+				return true;
+			case "label":
+				var correct_label : LabelControl = this[item_name] as LabelControl;
+				correct_label.text = lbltext;
+				return true;
+			case "checkbox":
+				var correct_checkbox: CheckBox = this[item_name] as CheckBox;
+				correct_checkbox.label = lbltext;
+			default:
+				DebugUtils.LOG_WARNING("[UML GUI][AS] Item type `" + item_type + "`is not valid (must be button, label or checkbox).")
+				return false;
+		}
+	  }
+	  
 	}
 }

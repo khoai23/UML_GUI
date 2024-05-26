@@ -21,12 +21,19 @@ import inspect
 __all__ = ('UML_MainGUI', )
 
 def getTextureFilename(tfn):
+    # retrieve the texture filename for camo/paint/decal that are unnamed.
     # should have slash at front and dot at back
     if(r"/" in tfn):
         tfn = tfn.split(r"/")[-1]
     if(r"." in tfn):
         tfn = tfn.split(".")[0]
     return tfn
+    
+FIELD_PRIORITY = {f: i for i, f in enumerate(["enabled", "swapNPC", "useWhitelist", "whitelist", "alignToTurret", "camouflageID", "paintID", "parent", "styleID", "hull", "hullStyle", "turret", "turretStyle", "gun", "gunStyle", "configString"])}
+def _custom_field_priority(field_and_value):
+    field, value = field_and_value
+    # prepend extra number to give priority to fields; this should hopefully cause the section to organize when dumping to xml.
+    return (FIELD_PRIORITY.get(field, 1000), field)
 
 class UML_mainMeta(AbstractWindowView):
     def onWindowClose(self):
@@ -48,11 +55,13 @@ class UML_mainMeta(AbstractWindowView):
 class UML_MainGUI(UML_mainMeta):
     def __init__(self, *args, **kwargs):
         super(UML_MainGUI, self).__init__(*args, **kwargs)
-        self.metapath, self.fullpath = 'scripts/client/mods/ownModelMeta.xml', "scripts/client/mods/ownModel.xml"
+        # NOTE: metapath/fullpath are using xml file so it's one directory in (res/res_mods) and need the ..; json are using python default so it's root
+        self.metapath, self.fullpath, self.localizationpath = '../mods/configs/UML/ownModelMeta.xml', "../mods/configs/UML/ownModel.xml", "mods/configs/UML/localization.json"
         self.sectionMeta = self.openXMLConfig(self.metapath)
         self.sectionMain = self.openXMLConfig(self.fullpath)
         ctx = self.configCtx = (None, self.fullpath)
         self.sectionMainModel =  _xml.getChildren(ctx, self.sectionMain, 'models')
+        self._localization = None
         
         self.metakey = {"remodelsFilelist" : "configLib"} # keys that will be written to sectionMeta
         self.mainkey = {"affectHangar":"affectHangar", 
@@ -78,7 +87,7 @@ class UML_MainGUI(UML_mainMeta):
         self._type_data = {"heavyTank": set(), "lightTank": set(), "mediumTank": set(), "AT-SPG": set(), "SPG": set()}
         self._list_styles = dict()
         # ignore the variants by keywords. Maybe?
-        ignore_keyword = {"MapsTraining", "_bootcamp", "_FL", "_training", "_IGR", "_bot", "_bob", "_CL", "_fallout", "_cl"}
+        ignore_keyword = {"MapsTraining", "_bootcamp", "_FL", "_training", "_IGR", "_bot", "_bob", "_CL", "_fallout", "_cl", "_SH"}
         for vehicle_obj in list_every_vehicles:
             nation, tankprofilename = vehicle_obj.name.split(":")
             if(any(k in tankprofilename for k in ignore_keyword)):
@@ -162,6 +171,7 @@ class UML_MainGUI(UML_mainMeta):
             usedSection.writeString(truekey, ", ".join(str(v).strip() for v in value) )
         else:
             print("[UML GUI] Unknown type {} of value {}, can't write to chosen section.".format(type(value), value))
+            
     @property
     def currentOMObject(self):
         if(hasattr(BigWorld, "om")):
@@ -229,6 +239,14 @@ class UML_MainGUI(UML_mainMeta):
                                 "styleSet": self.readValueFromSection(section, "styleSet", str, sectionCtx=profileCtx, default="0"),
                                 "styleProgression": self.readValueFromSection(section, "styleProgression", str, sectionCtx=profileCtx, default="4"),
                                 "alignToTurret": self.readValueFromSection(section, "alignToTurret", bool, sectionCtx=profileCtx, default=False),
+                                # additional effect found in config
+                                "effectsGun": self.readValueFromSection(section, "effectsGun", str, sectionCtx=profileCtx, default=""),
+                                "effectsReload": self.readValueFromSection(section, "effectsReload", str, sectionCtx=profileCtx, default=""),
+                                "soundChassisPC": self.readValueFromSection(section, "soundChassisPC", str, sectionCtx=profileCtx, default=""),
+                                "soundChassisNPC": self.readValueFromSection(section, "soundChassisNPC", str, sectionCtx=profileCtx, default=""),
+                                "soundTurret": self.readValueFromSection(section, "soundTurret", str, sectionCtx=profileCtx, default=""),
+                                "soundEnginePC": self.readValueFromSection(section, "soundEnginePC", str, sectionCtx=profileCtx, default=""),
+                                "soundEngineNPC": self.readValueFromSection(section, "soundEngineNPC", str, sectionCtx=profileCtx, default=""),
                              }
                 # add, read parent; if exist, add it to the config structure
                 parent = self.readValueFromSection(section, "parent", str, sectionCtx=profileCtx, default="invalid_parent_str")
@@ -384,7 +402,7 @@ class UML_MainGUI(UML_mainMeta):
             section.deleteSection("styleProgression")
             model_obj.pop("styleProgression", None)
         # write all remaining fields.
-        for headerkey, headervalue in model_obj.items(): # write all other options other than name
+        for headerkey, headervalue in sorted(model_obj.items(), key=_custom_field_priority): # write all other options other than name
             self.writeDataToSection(headerkey, headervalue, usedSection=section)
         
     def loadCustomizationDataFromPy(self):
@@ -404,7 +422,8 @@ class UML_MainGUI(UML_mainMeta):
      
     def getPossibleStyleOfProfileFromPy(self, profilename):
         if(profilename in self._list_styles):
-            return ["No Style"] + self._list_styles[profilename]
+            # when reaching here; the localization should have been loaded.
+            return [self._localization.get("current_profile_no_style_option", "current_profile_no_style_option")] + self._list_styles[profilename]
         else:
             return None
         
@@ -416,6 +435,86 @@ class UML_MainGUI(UML_mainMeta):
         result = eval(evalCmd)
         print("[UML GUI] Debug: " + str(result))
         return result
+        
+    def getStringLocalizationFromPy(self):
+        use_cache = not self.getIsDebugUMLFromPy() # cache unless the debug mode is enabled.
+        if use_cache or self._localization is None:
+            try:
+                with open(self.localizationpath, "r") as locfile:
+                    self._localization = localization = json.load(locfile)
+            except Exception as e:
+                # if cannot open, use default alongside a warning.
+                print("[UML GUI] Localization file cannot be loaded from `{}`; this will use & dump the default to directory.".format(self.localizationpath))
+                self._localization = localization = self._defaultLocalization()
+                with open(self.localizationpath, "w") as locfile:
+                    json.dump(localization, locfile, indent=2)
+        return json.dumps(self._localization)
+    
+    def _defaultLocalization(self):
+        return {
+            # General, UML wide section - MOE, show in hangar, additional filelist etc.
+            "moe_options": ["Default MOE", "No MOE", "1 MOE", "2 MOE", "3 MOE"],
+            "add_profile_to_moe_desc": "From Selector",
+            "moe_list_desc": "applied to: ", # label linking MOE selector - MOE list
+            "moe_texture_desc": "using texture: ", # label linking MOE list - MOE icon selection; this doesnt work yet.
+            "moe_list_placeholder": "Test localization binding.", # doesnt work anyway since MOE get selected on entry.
+            "affect_hangar_desc": "View UML effect in hangar",
+            "remodels_filelist_desc": "Base Remodel files:",
+            "use_uml_sound_desc": "Use UML's sound",
+            "additional_setting_desc": "Additional Settings", # sub-section: additional, rarely used settings.
+            "remove_3d_style_desc": "Remove all 3D Styles",
+            "remove_unhistorical_desc": "Remove ahistorical items (incl. replays)",
+            "remove_clan_logo_desc": "Remove Clan Logo",
+            "force_clan_logo_desc": "Clan ID:",
+            "swap_friendly_enable_desc": "Swap ALL friendly vehicles",
+            "swap_friendly_desc": "Using:",
+            "add_profile_friendly_desc": "Add current Profile",
+            "swap_enemy_enable_desc": "Swap ALL enemy vehicles",
+            "swap_enemy_desc": "Using:",
+            "add_profile_enemy_desc": "Add current Profile",
+            
+            # Single profile section 
+            "toggle_show_ignore_desc": "Show ignored profiles",
+            "current_profile_ignore_desc": "Ignore by GUI",
+            "current_profile_target_desc": "Enabled profiles:",
+            "current_profile_enable_desc": "Enabled",
+            "current_profile_swapNPC_desc": "Model swap NPC",
+            "current_profile_alignToTurret_desc": "Align to Turret",
+            "current_profile_camo_desc": "Camouflage ID:",
+            "current_profile_paint_desc": "Paint ID:",
+            "current_profile_configString_desc": "Config:",
+            "current_profile_style_progression_desc": "(Progress) Style:",
+            "current_profile_gunEffect_desc": "Gun Effect/Sound",
+            "current_profile_soundTurret_desc": "Turret Sound",
+            "current_profile_soundChassis_desc": "Chassis Sound (PC/NPC)",
+            "current_profile_soundEngine_desc": "Engine Sound (PC/NPC)",
+            "current_profile_no_style_option": "No Style",
+            "hybrid_desc": "Hybrid Vehicle Configuration", # sub-section: hybrid vehicle config.
+            "profile_chassis_desc": "Chassis:",
+            "profile_hull_desc": "Hull:",
+            "profile_turret_desc": "Turret:",
+            "profile_gun_desc": "Gun:",
+            "profile_hull_from_selector_desc": "From Selector",
+            "profile_turret_from_selector_desc": "From Selector",
+            "profile_gun_from_selector_desc": "From Selector",
+            "use_hangar_vehicle_btn": "Add hangar vehicle to Whitelist",
+            "delete_profile_btn": "Delete this Profile",
+            "camo_no_change_option": "No change", # sub-section: camo, paint & decal options.
+            "camo_remove_option": "Remove",
+            "paint_no_change_option": "No change",
+            "paint_remove_option": "Remove",
+            "decal_no_change_option": "No change",
+            "decal_remove_option": "Remove",
+            
+            # Vehicle Selector option
+            "vehicle_selector_desc": "Vehicle Selector",
+            "add_profile_btn": "Add as new Profile",
+            "add_whitelist_btn": "Add to Whitelist",
+            "add_profile_as_parent_btn": "Add as Parent to ",
+            
+            "apply_btn": "Apply",
+            "reload_btn": "Reload",
+            }
     
 """Add binding from the AS's UML_MainGUI class to the current python UML_MainGUI class"""
 g_entitiesFactories.addSettings(ViewSettings("UML_MainGUI", UML_MainGUI, 'UML_MainGUI.swf',

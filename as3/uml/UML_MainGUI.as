@@ -55,6 +55,7 @@ package uml
 	  public var backward_btn : SoundButtonEx;
 	  public var profile_selector : DropdownMenu;
 	  public var toggle_show_ignore: CheckBox;
+	  public var toggle_show_activated: CheckBox;
 	  
 	  public var current_profile_name : TextInput;
 	  public var current_profile_ignore: CheckBox;
@@ -149,8 +150,9 @@ package uml
 	  protected var list_profile_objects : Array;
 	  protected var list_styles : Array = null;
 	  protected var list_hybrid_parts_styles : Array = [new Array(), new Array(), new Array()];
-	  protected var customization_data : Object;
-	  protected var localization_data: Object;
+	  protected var customization_data : Object = null;
+	  protected var localization_data: Object = null;
+	  protected var position_data: Object = null;
 	  
 	  public var getIsDebugUMLFromPy : Function = null; 				// this will get UML's debug to decide showing debug fields (eval, exec) or not
 	  public var forcedCustomizationIsAvailableAtPy : Function = null; 	// this will check if forcedCustomization module exist or not
@@ -167,6 +169,7 @@ package uml
 	  public var checkIsValidWoTVehicleAtPy : Function = null; 			// check valid code to create hybrids
 	  public var getValidKeyBindFromPy: Function = null; 				// list keybinds that are available on UML.
 	  public var getStringLocalizationFromPy: Function = null;			// retrieve localizable dict to use 
+	  public var getStringPositionFromPy: Function = null;				// retrieve customizable dictionary related to positions - 
 
 	  public function UML_MainGUI() {
 		 super();
@@ -175,43 +178,43 @@ package uml
 	  override protected function onPopulate() : void {
 		 super.onPopulate();
 		 this.localization_data = App.utils.JSON.decode(this.getStringLocalizationFromPy());
+		 this.position_data = App.utils.JSON.decode(this.getStringPositionFromPy());
 		 
-		 this.moe_selector = createDropdown(35, 10 - 3);
-		 this.moe_selector.dataProvider = new DataProvider(retrieveLocalized("moe_options", ["Default MOE", "No MOE", "1 MOE", "2 MOE", "3 MOE"]) as Array);
-		 var moe_help_1 : LabelControl = createLabel("moe_list_desc", 35 + 135, 10);
-		 // this.moe_list = createTextInput("moe_list_placeholder", 35 + 195, 10 - 3);
-		 this.moe_list = createTextInput("moe_list_placeholder", 35 + 195, 10 - 3);
-		 this.add_profile_to_moe_btn = createButton("add_profile_to_moe_desc", 35 + 330, 10, true);
-		 var moe_help_2 : LabelControl = createLabel("using texture: ", 35 + 330 + 95, 10);
-		 this.moe_nation = createDropdown(35 + 330 + 95 + 85 , 10 - 3);
-		 this.moe_nation.dataProvider = new DataProvider(["Default"]);
-		 this.moe_nation.selectedIndex = 0;
-		 this.moe_nation.enabled = false;
-		 
-		 this.affect_hangar = createCheckbox("affect_hangar_desc", 35, 35);
-		 this.use_UML_sound = createCheckbox("use_uml_sound_desc", 200, 35);
-		 
-		this.remodels_filelist_label = createLabel("remodels_filelist_desc", 325, 35);
-		this.remodels_filelist_label.width = 175;
-		this.remodels_filelist = createTextInput("remodel_filelist_placeholder", 430, 30);
+		 var start_x: Number = this.position_data["start_x"]; 										// from left; default 35
+		 var start_y: Number = this.position_data["start_y"]; 										// from top; default 10
+		 var box_offset: Number = this.position_data["box_offset"]; 								// offset to minus the "box" (e.g dropdown, textinput) so that they align center to each other. Default -3
+		 var item_spacing: Number = this.position_data["item_spacing"]; 							// spacing between row-item; default 10
+		 var section_spacing: Number = this.position_data["section_spacing"];						// spacing between independent section; default 20
+		 var row_increment: Number = this.position_data["row_increment"]; 							// increment when going down a row; default 20
 		
-		//var mock_data : DataProvider = new DataProvider([{nation_name: "china", profile_name: "Ch01_Type59"}, {nation_name: "UML", profile_name: "Edweird_T-55A"}]);
-		var sizeObject : Object = this.createProfileList(35, 65);
+		// build the meta section on span row 1
+		var metaSectionSize: Object = this.createMetaSetting(start_x, start_y, item_spacing, row_increment, box_offset);
+		// build the profile list on row 2 col 1
+		var profileListSize: Object = this.createProfileList(start_x, start_y + metaSectionSize["height"] + section_spacing, item_spacing, row_increment, box_offset, this.position_data["profile_region_width"] as Array);
+		// build the advanced profile option on row 3 col 1
+		var additionalFieldsSize: Object = this.createProfileAdditionalFields(start_x, profileListSize["y"] + profileListSize["height"] + section_spacing, item_spacing, row_increment, box_offset, this.position_data["sound_region_width"] as Array, this.position_data["hybrid_region_width"] as Array, this.position_data["subsection_indent"]);
+		// compare both col 1 option above; assert position for col 2
+		var column_2_x: Number = start_x + Math.max(additionalFieldsSize["width"], profileListSize["width"]) + section_spacing;
+		// build the UML additional setting on row 2 col 2
+		var settingSize : Object = this.createAdditionalSettings(column_2_x, profileListSize["y"], item_spacing, row_increment, box_offset, this.position_data["swapall_width"]);
+		// build the vehicle selector on row 3 col 2
+		var vehicleSelectorSize : Object = this.createVehicleSelector(column_2_x, profileListSize["y"] + Math.max(profileListSize["height"], settingSize["height"]) + section_spacing, item_spacing, row_increment, box_offset, this.position_data["dropdown_width"]);
 		
 		// set dynamic width-height depending on possible options; adding components relying on those fields as needed after.
-		this.width = sizeObject.width + 35;// 800;
-		this.height = sizeObject.height + 50;//400;
+		this.width = Math.max(settingSize["x"] + settingSize["width"], vehicleSelectorSize["x"] + vehicleSelectorSize["width"]) + start_x;
+		this.height = Math.max(additionalFieldsSize["y"] + additionalFieldsSize["height"], vehicleSelectorSize["y"] + vehicleSelectorSize["height"]) + start_y;
 		 
-		if(this.getIsDebugUMLFromPy()) { 
+		this.height = Math.max(additionalFieldsSize["y"] + additionalFieldsSize["height"], vehicleSelectorSize["y"] + vehicleSelectorSize["height"]) + start_y + row_increment*2;
+		if(this.getIsDebugUMLFromPy()) {
 			// debug
-			this.debug_exec_field = createTextInput("debug_exec_field", 32,  this.height - 35);
-			this.debug_eval_field = createTextInput("debug_eval_field", 162,  this.height - 35);
-			this.debug_btn = createButton("Debug", 295,  this.height - 35, true);
+			this.debug_exec_field = createTextInput("debug_exec_field", 32,  this.height - row_increment - start_y);
+			this.debug_eval_field = createTextInput("debug_eval_field", 162,  this.height - row_increment - start_y);
+			this.debug_btn = createButton("Debug", 295,  this.height - row_increment - start_y, true);
 			this.debug_btn.addEventListener(ButtonEvent.CLICK, this.sendDebugCmdFromAS);
 		}
 
-		this.apply_button = createButton("apply_btn", this.width - 200, this.height - 35);
-		this.reload_button = createButton("reload_btn", this.width - 385, this.height - 35);
+		this.apply_button = createButton("apply_btn", this.width - 200, this.height - row_increment - start_y);
+		this.reload_button = createButton("reload_btn", this.width - 385, this.height - row_increment - start_y);
 		this.apply_button.addEventListener(ButtonEvent.CLICK, this.sendStringConfigFromAS);
 		this.reload_button.addEventListener(ButtonEvent.CLICK, this.setStringConfigToAS);
 		// bind to MOE button above.
@@ -221,179 +224,240 @@ package uml
 		 this.setStringConfigToAS();
 	  }
 	  
-	  internal function createProfileList(x: Number, y: Number) : Object {
-		// try to create a profile list
-		// TODO properly lock the values to currentX and currentY
-		var currentX : Number = x; // should be 35
-		var currentY : Number = y; // should be 65
-		var sectionX : Number = x;
-		var sectionY : Number = y;
-		if(this.isStatic) {
-			// button for forward/backward around the profile selector
-			this.backward_btn = createButton("<", currentX, currentY, true);
-			// menu to select profile to edit
-			this.profile_selector = this.createDropdown(currentX + 30, currentY - 3);
-			this.forward_btn = createButton(">", currentX + 170, currentY, true);
-			
-			// ignore list
-			this.toggle_show_ignore = createCheckbox("toggle_show_ignore_desc", currentX + 200, currentY);
-			//this.profile_selector.dataProvider = new DataProvider(["option1", "option2"]);
-			
-			// section is moved downward 2 spaces (20) to 105
-			sectionX = currentX; sectionY = currentY + 40;
-			// format: profile name (label) - enable - whitelist
-			//this.profile_selector.dataProvider.invalidate();
-			this.current_profile_name = createTextInput("profile_placeholder", sectionX, sectionY - 3);
-			this.current_profile_name.editable = false;
-			this.current_profile_name.width = 220;
-			this.current_profile_ignore = createCheckbox("current_profile_ignore_desc", sectionX + 225, sectionY);
-			// this.current_profile_name.autoSize = TextFieldAutoSize.LEFT;
-			// this.current_profile_name.toolTip = "The full name of the profile.";
-			this.current_profile_target_help = createLabel("current_profile_target_desc", sectionX + 125, sectionY + 20);
-			this.current_profile_target = createTextInput("whitelist_placeholder", sectionX + 225, sectionY + 20 - 3);
-			this.current_profile_enable = createCheckbox("current_profile_enable_desc", sectionX, sectionY + 20);
-			this.current_profile_swapNPC = createCheckbox("current_profile_swapNPC_desc", sectionX, sectionY + 40);
-			this.current_profile_alignToTurret = createCheckbox("current_profile_alignToTurret_desc", sectionX, sectionY + 60);
-
-			this.current_profile_camo_help = createLabel("current_profile_camo_desc", sectionX + 125, sectionY + 40);
-			this.current_profile_camo = createDropdown(sectionX + 225, sectionY + 40 - 3);
-			this.current_profile_camo.width = 180;
-			this.current_profile_paint_help = createLabel("current_profile_paint_desc", sectionX + 125, sectionY + 60);
-			this.current_profile_paint = createDropdown(sectionX + 225, sectionY + 60 - 3);
-			this.current_profile_paint.width = 180;
-
-			this.current_profile_configString_help = createLabel("current_profile_configString_desc", sectionX, sectionY + 80)
-			this.current_profile_configString = createTextInput("N/A", sectionX + 50, sectionY + 80 - 3);
-			this.current_profile_configString.width = 60; this.current_profile_configString.maxChars = 4;
-			this.current_profile_style_help = createLabel("current_profile_style_progression_desc", sectionX + 125, sectionY + 80);
-			this.current_profile_style_progression = createTextInput("4", sectionX + 225, sectionY + 80 - 3);
-			this.current_profile_style_progression.width = 30; this.current_profile_style_progression.maxChars = 1; this.current_profile_style_progression.enabled = false;
-			this.current_profile_style = createDropdown(sectionX + 225 + 35, sectionY + 80 - 3);
-			
-			this.current_profile_gunEffect_help = createLabel("current_profile_gunEffect_desc", sectionX, sectionY + 100 );
-			this.current_profile_gunEffect = createTextInput("", sectionX + 105, sectionY + 100 - 3); this.current_profile_gunEffect.width = 105;
-			this.current_profile_soundTurret_help = createLabel("current_profile_soundTurret_desc", sectionX + 215, sectionY + 100);
-			this.current_profile_soundTurret = createTextInput("", sectionX + 215 + 105, sectionY + 100 - 3); this.current_profile_soundTurret.width = 105;
-			this.current_profile_soundChassis_help = createLabel("current_profile_soundChassis_desc", sectionX, sectionY + 120);
-			this.current_profile_soundChassis = createTextInput("", sectionX + 105, sectionY + 120 - 3); this.current_profile_soundChassis.width = 105;
-			this.current_profile_soundEngine_help = createLabel("current_profile_soundEngine_desc", sectionX + 215, sectionY + 120);
-			this.current_profile_soundEngine = createTextInput("", sectionX+ 215 + 105, sectionY + 120 - 3); this.current_profile_soundEngine.width = 105;
-			// +5 for comfortable margin of button
-			this.use_hangar_vehicle = createButton("use_hangar_vehicle_btn", sectionX + 20, sectionY + 145, true);
-			this.delete_profile = createButton("delete_profile_btn", sectionX + 230, sectionY + 145, true);
-			this.populatePaintCamo();
-			
-			// section is moved downward 8+ spaces (170) to 380
-			sectionX = currentX; sectionY = sectionY + 170;
-			this.hybrid_help = createLabel("hybrid_desc", sectionX, sectionY)
-			this.profile_chassis_help = createLabel("profile_chassis_desc", sectionX, sectionY + 20);
-			this.profile_chassis = createTextInput("N/A", sectionX + 50, sectionY + 20 - 3);
-			this.profile_chassis_style = createDropdown(sectionX, sectionY + 40 - 3); this.profile_chassis_style.width = 120;
-			this.profile_hull_help = createLabel("profile_hull_desc", sectionX + 215, sectionY + 20);
-			this.profile_hull = createTextInput("N/A", sectionX + 215 + sectionX, sectionY + 20 - 3);
-			this.profile_hull_style = createDropdown(sectionX + 215, sectionY + 40 - 3); this.profile_hull_style.width = 120;
-			this.profile_hull_from_selector = createButton("profile_hull_from_selector_desc", sectionX + 215 + 120, sectionY + 40, true);
-			this.profile_turret_help = createLabel("profile_turret_desc", sectionX, sectionY + 60);
-			this.profile_turret = createTextInput("N/A", sectionX + 50, sectionY + 60 - 3);
-			this.profile_turret_style = createDropdown(sectionX, sectionY + 80 - 3); this.profile_turret_style.width = 120;
-			this.profile_turret_from_selector = createButton("profile_turret_from_selector_desc", sectionX + 120, sectionY + 80, true);
-			this.profile_gun_help = createLabel("profile_gun_desc", sectionX + 215, sectionY + 60);
-			this.profile_gun = createTextInput("N/A", sectionX + 215 + sectionX, sectionY + 60 - 3);
-			this.profile_gun_style = createDropdown(sectionX + 215, sectionY + 80 - 3); this.profile_gun_style.width = 120;
-			this.profile_gun_from_selector = createButton("profile_gun_from_selector_desc", sectionX + 215 + 120, sectionY + 80, true);
-			this.profile_chassis.enabled = false;
-
-			// adding appropriate listeners
-			this.forward_btn.addEventListener(ButtonEvent.CLICK, this.forwardProfileIndex);
-			this.backward_btn.addEventListener(ButtonEvent.CLICK, this.backwardProfileIndex);
-			this.profile_selector.addEventListener(ListEvent.INDEX_CHANGE, this.loadProfileAtCurrentIndex);
-			this.toggle_show_ignore.addEventListener(ButtonEvent.CLICK, this.reloadProfileSelector);
-			// this.profile_selector.dataProvider = new DataProvider(["mock1", "mock2"]);
-
-			this.current_profile_enable.addEventListener(ButtonEvent.CLICK, this.onSetEnableProfile);
-			this.current_profile_swapNPC.addEventListener(ButtonEvent.CLICK, this.onSetEnableProfileForNPC);
-			this.current_profile_alignToTurret.addEventListener(ButtonEvent.CLICK, this.onSetAlignToTurret);
-			this.current_profile_ignore.addEventListener(ButtonEvent.CLICK, this.onIgnoreChange);
-			this.current_profile_target.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onWhitelistChange);
-			this.current_profile_camo.addEventListener(ListEvent.INDEX_CHANGE, this.onCamoChange);
-			this.current_profile_paint.addEventListener(ListEvent.INDEX_CHANGE, this.onPaintChange);
-			this.current_profile_style.addEventListener(ListEvent.INDEX_CHANGE, this.onStyleChange);
-			this.current_profile_style_progression.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onProgressionChange);
-			this.current_profile_configString.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onConfigStringChange);
-			
-			this.current_profile_gunEffect.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onEffectChange);
-			this.current_profile_soundTurret.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onEffectChange);
-			this.current_profile_soundChassis.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onEffectChange);
-			this.current_profile_soundEngine.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onEffectChange);
-			
-			this.delete_profile.addEventListener(ButtonEvent.CLICK, this.removeProfile);
-			this.use_hangar_vehicle.addEventListener(ButtonEvent.CLICK, this.addHangarVehicleToWhitelist);
-
-			this.profile_hull.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.updateHybridParts);
-			this.profile_turret.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.updateHybridParts);
-			this.profile_gun.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.updateHybridParts);
-			this.profile_hull_from_selector.addEventListener(ButtonEvent.CLICK, this.updateHybridParts);
-			this.profile_turret_from_selector.addEventListener(ButtonEvent.CLICK, this.updateHybridParts);
-			this.profile_gun_from_selector.addEventListener(ButtonEvent.CLICK, this.updateHybridParts);
-			this.profile_chassis_style.addEventListener(ListEvent.INDEX_CHANGE, this.onStyleChange);
-			this.profile_hull_style.addEventListener(ListEvent.INDEX_CHANGE, this.onStyleChange);
-			this.profile_turret_style.addEventListener(ListEvent.INDEX_CHANGE, this.onStyleChange);
-			this.profile_gun_style.addEventListener(ListEvent.INDEX_CHANGE, this.onStyleChange);
-			// 
-			currentX = x + 425; // 460
-			currentY = y + 380; // 415
-			
-			// adding the concerning VehicleSelector panel
-			var altCurrentY : Number = y;
-			altCurrentY = this.createAdditionalSettings(currentX, altCurrentY)
-			var sizeObject : Object = this.createVehicleSelector(currentX, altCurrentY);
-			currentX = sizeObject.x;
-			currentY = (currentY > sizeObject.y) ? currentY : sizeObject.y; // take the longest Y (height)
-		}
-		else {
-			// not working ATM; this version is interactable but do not display
-			this.profile_list = addChild(App.utils.classFactory.getComponent(App.utils.classFactory.getClassName(ScrollingListPx), ScrollingListPx, {
-				"x": 35, "y": 50, "width": this.width - 75, "height": this.height - 115, "itemRenderer": UML_Profile, "scrollBar": "ScrollBar", "scrollPosition": 0
-			})) as ScrollingListPx;
-		   this.profile_list.selectedIndex = -1;
-		   this.profile_list.dataProvider.invalidate();
-		   this.profile_list.visible = true;
-		}
-		return {width: currentX, height: currentY};
-	  }
-	  
-	  internal function populatePaintCamo() : void {
-		this.customization_data = this.loadCustomizationDataFromPy();
-		// update with Remove & No change (-1, 0)
-		this.customization_data["camoName"].unshift(retrieveLocalizedString("camo_remove_option", "camo_remove_option"), retrieveLocalizedString("camo_no_change_option", "camo_no_change_option"));
-		this.customization_data["paintName"].unshift(retrieveLocalizedString("paint_remove_option", "paint_remove_option"), retrieveLocalizedString("paint_no_change_option", "paint_no_change_option"));
-		this.customization_data["decalName"].unshift(retrieveLocalizedString("decal_remove_option", "decal_remove_option"), retrieveLocalizedString("decal_no_change_option", "decal_no_change_option"));
-		this.customization_data["camoID"].unshift(-1, 0);
-		this.customization_data["paintID"].unshift(-1, 0);
-		this.customization_data["decalID"].unshift(-1, 0);
+	  internal function createMetaSetting(section_x: Number, section_y: Number, item_spacing: Number, row_increment: Number, box_offset: Number) : Object {
+		// build the Meta-related setting of UML (additional libs, MOE etc.)
+		// value to record the bound of this setting box
+		var x_bound: Number = section_x; var y_bound: Number = section_y; 
+		// value to calculate the current item
+		var current_x: Number = section_x; var current_y: Number = section_y;
 		
-		this.current_profile_camo.dataProvider = new DataProvider(this.customization_data["camoName"]);
-		this.current_profile_paint.dataProvider = new DataProvider(this.customization_data["paintName"]);
-		this.current_profile_camo.invalidateData();
-		this.current_profile_paint.invalidateData();
-		this.current_profile_camo.selectedIndex = 1; // default to no changes
-		this.current_profile_paint.selectedIndex = 1;
+		// row 1 - all this in one line.
+		this.moe_selector = createDropdown(current_x, current_y - box_offset);
+		this.moe_selector.dataProvider = new DataProvider(retrieveLocalized("moe_options", ["Default MOE", "No MOE", "1 MOE", "2 MOE", "3 MOE"]) as Array);
+		
+		current_x += this.moe_selector.width + item_spacing;
+		var moe_help_1 : LabelControl = createLabel("moe_list_desc", current_x, current_y);
+		
+		current_x += moe_help_1.width + item_spacing;
+		this.moe_list = createTextInput("moe_list_placeholder", current_x, current_y - box_offset);
+		
+		current_x += this.moe_list.width + item_spacing;
+		this.add_profile_to_moe_btn = createButton("add_profile_to_moe_desc", current_x, current_y, true);
+		
+		current_x += this.add_profile_to_moe_btn.width + item_spacing;
+		var moe_help_2 : LabelControl = createLabel("moe_texture_desc", current_x, current_y);
+		
+		current_x = current_x + moe_help_2.width + item_spacing;
+		this.moe_nation = createDropdown(current_x, current_y - box_offset);
+		this.moe_nation.dataProvider = new DataProvider(["Default"]);
+		this.moe_nation.selectedIndex = 0;
+		this.moe_nation.enabled = false;
+		
+		x_bound = current_x + this.moe_nation.width; y_bound = current_y + row_increment;
+
+		// row 2 
+		current_x = section_x;
+		current_y = current_y + row_increment;
+		this.affect_hangar = createCheckbox("affect_hangar_desc", current_x, current_y);
+		
+		current_x += this.affect_hangar.width + item_spacing;
+		this.use_UML_sound = createCheckbox("use_uml_sound_desc", current_x, current_y);
+
+		current_x += this.use_UML_sound.width + item_spacing;
+		this.remodels_filelist_label = createLabel("remodels_filelist_desc", current_x, current_y);
+		
+		current_x += this.remodels_filelist_label.width + item_spacing;
+		this.remodels_filelist = createTextInput("remodel_filelist_placeholder", current_x, current_y - box_offset);
+		
+		x_bound = Math.max(x_bound, current_x + this.remodels_filelist.width);
+		y_bound = current_y + row_increment;
+		
+		return { x: section_x, y: section_y, width: x_bound - x, height: y_bound - y };
+	  }
+ 	  
+	  internal function createProfileList(section_x: Number, section_y: Number, item_spacing: Number, row_increment: Number, box_offset: Number, profile_region_width: Array) : Object {
+		// build the basic per-profile setting of UML.
+		var current_x : Number = section_x;
+		var current_y : Number = section_y;
+		// button for forward/backward around the profile selector
+		this.backward_btn = createButton("<", current_x, current_y, true);
+		// menu to select profile to edit
+		current_x += 30 + item_spacing;
+		this.profile_selector = this.createDropdown(current_x, current_y - box_offset);
+		this.profile_selector.width = profile_region_width[0];
+		current_x += profile_region_width[0] + item_spacing;
+		this.forward_btn = createButton(">", current_x, current_y, true);
+		
+		// ignore list & activated list, both in same column	
+		current_x += 30 + item_spacing;
+		this.toggle_show_ignore = createCheckbox("toggle_show_ignore_desc", current_x, current_y);
+		current_y += row_increment;
+		this.toggle_show_activated = createCheckbox("toggle_show_activated_desc", current_x, current_y)
+		//this.profile_selector.dataProvider = new DataProvider(["option1", "option2"]);
+		
+		// section is moved downward 2 row & returned to first column
+		// profile_region_width will denote [checkbox region][field desc][field region]
+		var first_column_x: Number = section_x;
+		var second_column_x: Number = first_column_x + profile_region_width[0];
+		var third_column_x: Number = second_column_x + profile_region_width[1];
+		current_x = section_x; current_y += row_increment;
+		// format: profile name (label) - enable - whitelist
+		//this.profile_selector.dataProvider.invalidate();
+		this.current_profile_name = createTextInput("profile_placeholder", current_x, current_y - box_offset);
+		this.current_profile_name.editable = false;
+		this.current_profile_name.width = profile_region_width[0] + profile_region_width[1] - item_spacing; // make this span 1+2 col, minus usual spacing.
+		this.current_profile_ignore = createCheckbox("current_profile_ignore_desc", third_column_x, current_y);
+		// this.current_profile_name.autoSize = TextFieldAutoSize.LEFT;
+		// this.current_profile_name.toolTip = "The full name of the profile.";
+		current_y += row_increment;
+		this.current_profile_target_help = createLabel("current_profile_target_desc", first_column_x, current_y);
+		this.current_profile_target = createTextInput("whitelist_placeholder", second_column_x, current_y - box_offset);
+		this.current_profile_target.width = profile_region_width[1] + profile_region_width[2]; // make this span 2+3 col; spacing should be handled by the desc if any.
+		
+		current_y += row_increment;
+		this.current_profile_enable = createCheckbox("current_profile_enable_desc", first_column_x, current_y);
+		this.current_profile_camo_help = createLabel("current_profile_camo_desc", second_column_x, current_y);
+		this.current_profile_camo = createDropdown(third_column_x, current_y - box_offset);
+		this.current_profile_camo.width = profile_region_width[2];
+		
+		current_y += row_increment;	
+		this.current_profile_swapNPC = createCheckbox("current_profile_swapNPC_desc", first_column_x, current_y);
+		this.current_profile_paint_help = createLabel("current_profile_paint_desc", second_column_x, current_y);
+		this.current_profile_paint = createDropdown(third_column_x, current_y - box_offset);
+		this.current_profile_paint.width = profile_region_width[2];
+		
+		current_y += row_increment;	
+		this.current_profile_alignToTurret = createCheckbox("current_profile_alignToTurret_desc", first_column_x, current_y);
+		this.current_profile_style_help = createLabel("current_profile_style_progression_desc", second_column_x, current_y);
+		this.current_profile_style_progression = createTextInput("4", third_column_x, current_y - box_offset);
+		this.current_profile_style_progression.width = 30; this.current_profile_style_progression.maxChars = 1; this.current_profile_style_progression.enabled = false;
+		this.current_profile_style = createDropdown(third_column_x + this.current_profile_style_progression.width + item_spacing, current_y - box_offset);
+		this.current_profile_style.width = profile_region_width[2] - this.current_profile_style_progression.width - item_spacing;
+
+		current_y += row_increment;	
+		this.current_profile_configString_help = createLabel("current_profile_configString_desc", second_column_x, current_y)
+		this.current_profile_configString = createTextInput("N/A", third_column_x, current_y - box_offset);
+		this.current_profile_configString.width = 60; this.current_profile_configString.maxChars = 4;
+		
+		current_y += row_increment;
+		this.use_hangar_vehicle = createButton("use_hangar_vehicle_btn", section_x + 20, current_y, true);
+		this.delete_profile = createButton("delete_profile_btn", section_x + 230, current_y, true);
+		
+		current_y += row_increment;
+		// building section finish; populate options.
+		this.populatePaintCamo();
+		
+
+		// adding appropriate listeners
+		this.forward_btn.addEventListener(ButtonEvent.CLICK, this.forwardProfileIndex);
+		this.backward_btn.addEventListener(ButtonEvent.CLICK, this.backwardProfileIndex);
+		this.profile_selector.addEventListener(ListEvent.INDEX_CHANGE, this.loadProfileAtCurrentIndex);
+		this.toggle_show_ignore.addEventListener(ButtonEvent.CLICK, this.reloadProfileSelector);
+		this.toggle_show_activated.addEventListener(ButtonEvent.CLICK, this.reloadProfileSelector);
+		// this.profile_selector.dataProvider = new DataProvider(["mock1", "mock2"]);
+
+		this.current_profile_enable.addEventListener(ButtonEvent.CLICK, this.onSetEnableProfile);
+		this.current_profile_swapNPC.addEventListener(ButtonEvent.CLICK, this.onSetEnableProfileForNPC);
+		this.current_profile_alignToTurret.addEventListener(ButtonEvent.CLICK, this.onSetAlignToTurret);
+		this.current_profile_ignore.addEventListener(ButtonEvent.CLICK, this.onIgnoreChange);
+		this.current_profile_target.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onWhitelistChange);
+		this.current_profile_camo.addEventListener(ListEvent.INDEX_CHANGE, this.onCamoChange);
+		this.current_profile_paint.addEventListener(ListEvent.INDEX_CHANGE, this.onPaintChange);
+		this.current_profile_style.addEventListener(ListEvent.INDEX_CHANGE, this.onStyleChange);
+		this.current_profile_style_progression.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onProgressionChange);
+		this.current_profile_configString.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onConfigStringChange);
+		
+		this.delete_profile.addEventListener(ButtonEvent.CLICK, this.removeProfile);
+		this.use_hangar_vehicle.addEventListener(ButtonEvent.CLICK, this.addHangarVehicleToWhitelist);
+		return {x: section_x, y: section_y, width: profile_region_width[0] + profile_region_width[1] + profile_region_width[2], height: current_y - section_y};
 	  }
 	  
-	  internal function createVehicleSelector(x: Number, y: Number) : Object {
+	  
+	  internal function createProfileAdditionalFields(section_x: Number, section_y: Number, item_spacing: Number, row_increment: Number, box_offset: Number, sound_region_width: Array, hybrid_region_width: Array, subsection_indent: Number): Object {
+		// build the advanced (sound effect, hybrid) options of UML.
+		var current_x : Number = section_x; var current_y : Number = section_y;
+		var sound_effect_help: LabelControl = createLabel("sound_effect_desc", current_x + subsection_indent, current_y);
+		
+		var onetwo_soundcol_x: Number = current_x + sound_region_width[0];
+		var twoone_soundcol_x: Number = onetwo_soundcol_x + sound_region_width[1] + item_spacing;
+		var twotwo_soundcol_x: Number = twoone_soundcol_x + sound_region_width[0];
+		// first row - 2 item (oneone, onetwo | twoone, twotwo)
+		current_y += row_increment;
+		this.current_profile_gunEffect_help = createLabel("current_profile_gunEffect_desc", current_x, current_y);
+		this.current_profile_gunEffect = createTextInput("", onetwo_soundcol_x, current_y - box_offset); this.current_profile_gunEffect.width = sound_region_width[1];
+		this.current_profile_soundTurret_help = createLabel("current_profile_soundTurret_desc", twoone_soundcol_x, current_y);
+		this.current_profile_soundTurret = createTextInput("", twotwo_soundcol_x, current_y - box_offset); this.current_profile_soundTurret.width = sound_region_width[1];
+		// second row, same thing
+		current_y += row_increment;
+		this.current_profile_soundChassis_help = createLabel("current_profile_soundChassis_desc", current_x, current_y);
+		this.current_profile_soundChassis = createTextInput("", onetwo_soundcol_x, current_y - box_offset); this.current_profile_soundChassis.width = sound_region_width[1];
+		this.current_profile_soundEngine_help = createLabel("current_profile_soundEngine_desc", twoone_soundcol_x, current_y);
+		this.current_profile_soundEngine = createTextInput("", twotwo_soundcol_x, current_y - box_offset); this.current_profile_soundEngine.width = sound_region_width[1];
+		
+		current_y += row_increment;
+		this.hybrid_help = createLabel("hybrid_desc", current_x + subsection_indent, current_y);
+		// 1-1 (chassis)
+		current_y += row_increment;
+		this.profile_chassis_help = createLabel("profile_chassis_desc", current_x, current_y);
+		this.profile_chassis = createTextInput("N/A", current_x + hybrid_region_width[0], current_y - box_offset);
+		this.profile_chassis_style = createDropdown(current_x, current_y + row_increment - box_offset); this.profile_chassis_style.width = hybrid_region_width[2];
+		// 1-2 (hull)
+		current_x += hybrid_region_width[0] + hybrid_region_width[1] + item_spacing;
+		this.profile_hull_help = createLabel("profile_hull_desc", current_x, current_y);
+		this.profile_hull = createTextInput("N/A", current_x + hybrid_region_width[0], current_y - box_offset);
+		this.profile_hull_style = createDropdown(current_x, current_y + row_increment - box_offset); this.profile_hull_style.width = hybrid_region_width[2];
+		this.profile_hull_from_selector = createButton("profile_hull_from_selector_desc", current_x + hybrid_region_width[2] + item_spacing, current_y + row_increment, true);
+		
+		// 2-1 (turret)
+		current_x = section_x; current_y += row_increment * 2;
+		this.profile_turret_help = createLabel("profile_turret_desc", current_x, current_y);
+		this.profile_turret = createTextInput("N/A", current_x + hybrid_region_width[0], current_y - box_offset);
+		this.profile_turret_style = createDropdown(current_x, current_y + row_increment - box_offset); this.profile_turret_style.width = hybrid_region_width[2];
+		this.profile_turret_from_selector = createButton("profile_turret_from_selector_desc", current_x + hybrid_region_width[2] + item_spacing, current_y + row_increment, true);
+		// 2-2 (gun)
+		current_x += hybrid_region_width[0] + hybrid_region_width[1] + item_spacing;
+		this.profile_gun_help = createLabel("profile_gun_desc", current_x, current_y);
+		this.profile_gun = createTextInput("N/A", current_x + hybrid_region_width[0], current_y - box_offset);
+		this.profile_gun_style = createDropdown(current_x, current_y + row_increment - box_offset); this.profile_gun_style.width = hybrid_region_width[2];
+		this.profile_gun_from_selector = createButton("profile_gun_from_selector_desc", current_x + hybrid_region_width[2] + item_spacing, current_y + row_increment, true);
+		this.profile_chassis.enabled = false;
+		// extra increment to allow outputting the full section region.
+		current_x = section_x; current_y += row_increment * 2;
+		
+		this.current_profile_gunEffect.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onEffectChange);
+		this.current_profile_soundTurret.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onEffectChange);
+		this.current_profile_soundChassis.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onEffectChange);
+		this.current_profile_soundEngine.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.onEffectChange);
+		
+		this.profile_hull.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.updateHybridParts);
+		this.profile_turret.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.updateHybridParts);
+		this.profile_gun.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.updateHybridParts);
+		this.profile_hull_from_selector.addEventListener(ButtonEvent.CLICK, this.updateHybridParts);
+		this.profile_turret_from_selector.addEventListener(ButtonEvent.CLICK, this.updateHybridParts);
+		this.profile_gun_from_selector.addEventListener(ButtonEvent.CLICK, this.updateHybridParts);
+		this.profile_chassis_style.addEventListener(ListEvent.INDEX_CHANGE, this.onStyleChange);
+		this.profile_hull_style.addEventListener(ListEvent.INDEX_CHANGE, this.onStyleChange);
+		this.profile_turret_style.addEventListener(ListEvent.INDEX_CHANGE, this.onStyleChange);
+		this.profile_gun_style.addEventListener(ListEvent.INDEX_CHANGE, this.onStyleChange);
+		
+		return {x: section_x, y: section_y, width: Math.max((sound_region_width[0] + sound_region_width[1]) * 2 + item_spacing, (hybrid_region_width[0] + hybrid_region_width[1]) * 2 + item_spacing), height: current_y - section_y};
+	  }
+	  
+	  internal function createVehicleSelector(section_x: Number, section_y: Number, item_spacing: Number, row_increment: Number, box_offset: Number, dropdown_width: Number) : Object {
 		// multiple dropdown list concerning nation-class-tier-vehicle to show the corresponding profile name
-		this.help_vehicle_selector = createLabel("vehicle_selector_desc", x, y);
-		this.vehicle_nations = createDropdown(x, y + 20);
-		this.vehicle_type = createDropdown(x + 135, y + 20);
-		this.vehicle_tier = createDropdown(x, y + 45);
-		this.vehicle_selector = createDropdown(x + 135, y + 45);
-		this.vehicle_profile_field = createTextInput("vehicle_profile_name", x + 60, y + 70);
+		this.help_vehicle_selector = createLabel("vehicle_selector_desc", section_x, section_y);
+		this.vehicle_nations = createDropdown(section_x, section_y + row_increment); this.vehicle_nations.width = dropdown_width;
+		this.vehicle_type = createDropdown(section_x + dropdown_width + item_spacing, y + section_y + row_increment); this.vehicle_type.width = dropdown_width;
+		this.vehicle_tier = createDropdown(section_x, section_y + row_increment * 2); this.vehicle_tier.width = dropdown_width;
+		this.vehicle_selector = createDropdown(section_x + dropdown_width + item_spacing, section_y + row_increment * 2); this.vehicle_selector.width = dropdown_width;
+		this.vehicle_profile_field = createTextInput("vehicle_profile_name", section_x + dropdown_width / 2 + item_spacing / 2, section_y + row_increment * 3);
+		this.vehicle_profile_field.width = dropdown_width;
 		// button to add to the profile list or whitelist.
-		this.add_profile_btn = createButton("add_profile_btn", x + 15, y + 95, true);
-		this.add_whitelist_btn = createButton("add_whitelist_btn", x + 15 + 135, y + 95, true);
+		this.add_profile_btn = createButton("add_profile_btn", section_x, section_y + row_increment * 4, true);
+		this.add_whitelist_btn = createButton("add_whitelist_btn", section_x + dropdown_width + item_spacing, section_y + row_increment * 4, true);
 		// button to add as a new profile
-		this.add_profile_as_parent_btn = createButton("add_profile_as_parent_btn", x + 20, y + 120, true);
-		this.profile_with_parent_field = createTextInput("profile_with_parent_placeholder", x + 135, y + 120 - 2);
+		this.add_profile_as_parent_btn = createButton("add_profile_as_parent_btn", section_x, section_y + row_increment * 5, true);
+		this.profile_with_parent_field = createTextInput("profile_with_parent_placeholder", section_x, section_y + row_increment * 6);
 		
 		var vsdata : Object = this.getVehicleSelectorDataFromPy();
 		this.vehicle_nations.dataProvider = new DataProvider(vsdata["nations"]);
@@ -414,30 +478,52 @@ package uml
 		this.add_profile_as_parent_btn.addEventListener(ButtonEvent.CLICK, this.addNewProfile);
 		// this.profile_with_parent_field.addEventListener(FocusHandlerEvent.FOCUS_OUT, this.addNewProfile); // don't need this one
 		
-		return {x: x + 270, y: y + 145}; // 650
+		return {x: section_x, y: section_y, width: dropdown_width * 2 + item_spacing, height: row_increment * 7}; // 650
 	  }
 	  
-	  internal function createAdditionalSettings(x: Number, y: Number): Number {
+	  internal function createAdditionalSettings(section_x: Number, section_y: Number, item_spacing: Number, row_increment: Number, box_offset: Number, swapall_width: Number): Object {
 		// these don't need listener, since they are strictly updated on Apply anyway. Except the add button.
-		var additional_setting_help : LabelControl = createLabel("additional_setting_desc", x, y);
-		this.remove_3d_style = createCheckbox("remove_3d_style_desc", x, y + 20);
-		this.remove_unhistorical = createCheckbox("remove_unhistorical_desc", x + 150, y + 20);
-		this.remove_clan_logo = createCheckbox("remove_clan_logo_desc", x, y + 40);
-		var force_clan_logo_help : LabelControl = createLabel("force_clan_logo_desc", x + 150, y + 40);
-		this.force_clan_logo = createTextInput("N/A", x + 210, y + 40 - 3); this.force_clan_logo.width = 75; this.force_clan_logo.enabled = false;
-		this.swap_friendly_enable = createCheckbox("swap_friendly_enable_desc", x, y + 60); this.swap_friendly_enable.width = 200;
-		var swap_friendly_help : LabelControl = createLabel("swap_friendly_desc", x, y + 80);
-		this.swap_friendly = createTextInput("swap_friendly_placeholder", x + 40, y + 80 - 3);
-		this.add_profile_friendly = createButton("add_profile_friendly_desc", x + 180, y + 80, true);
-		this.swap_enemy_enable = createCheckbox("swap_enemy_enable_desc", x, y + 100); this.swap_enemy_enable.width = 200;
-		var swap_enemy_help : LabelControl = createLabel("swap_enemy_desc", x, y + 120);
-		this.swap_enemy = createTextInput("swap_enemy_placeholder", x + 40, y + 120 - 3);
-		this.add_profile_enemy = createButton("add_profile_enemy_desc", x + 180, y + 120, true);
+		var additional_setting_help : LabelControl = createLabel("additional_setting_desc", section_x, section_y);
+		this.remove_unhistorical = createCheckbox("remove_unhistorical_desc", section_x, section_y + row_increment);
+		this.remove_3d_style = createCheckbox("remove_3d_style_desc", section_x, section_y + row_increment * 2);
+		this.remove_clan_logo = createCheckbox("remove_clan_logo_desc", section_x, section_y + row_increment * 3);
+		var force_clan_logo_help : LabelControl = createLabel("force_clan_logo_desc", section_x, section_y + row_increment * 4);
+		this.force_clan_logo = createTextInput("N/A", section_x + force_clan_logo_help.width + item_spacing, section_y + row_increment * 4); this.force_clan_logo.width = 75; this.force_clan_logo.enabled = false;
+		
+		this.swap_friendly_enable = createCheckbox("swap_friendly_enable_desc", section_x, section_y + row_increment * 5);
+		var swap_friendly_help : LabelControl = createLabel("swap_friendly_desc", section_x, section_y + row_increment * 6);
+		this.swap_friendly = createTextInput("swap_friendly_placeholder", section_x + swap_friendly_help.width + item_spacing, section_y + row_increment * 6 - box_offset);
+		this.swap_friendly.width = swapall_width;
+		this.add_profile_friendly = createButton("add_profile_friendly_desc", section_x + swap_friendly_help.width + swapall_width + item_spacing * 2, section_y + row_increment * 6, true);
+		
+		this.swap_enemy_enable = createCheckbox("swap_enemy_enable_desc", section_x, section_y + row_increment * 7);
+		var swap_enemy_help : LabelControl = createLabel("swap_enemy_desc", section_x, section_y + row_increment * 8);
+		this.swap_enemy = createTextInput("swap_enemy_placeholder", section_x + swap_enemy_help.width + item_spacing, section_y + row_increment * 8 - box_offset);
+		this.swap_enemy.width = swapall_width;
+		this.add_profile_enemy = createButton("add_profile_enemy_desc", section_x + swap_enemy_help.width + swapall_width + item_spacing * 2, section_y + row_increment * 8, true);
 		
 		this.add_profile_friendly.addEventListener(ButtonEvent.CLICK, this.addCurrentProfileToSwapList);
 		this.add_profile_enemy.addEventListener(ButtonEvent.CLICK, this.addCurrentProfileToSwapList);
 		
-		return y + 140 + 10; // 410
+		return {x: section_x, y: section_y, width: swap_friendly_help.width + swapall_width + item_spacing * 2 + this.add_profile_friendly.width, height: row_increment * 9}
+	  }
+	  
+	  internal function populatePaintCamo() : void {
+		this.customization_data = this.loadCustomizationDataFromPy();
+		// update with Remove & No change (-1, 0)
+		this.customization_data["camoName"].unshift(retrieveLocalizedString("camo_remove_option", "camo_remove_option"), retrieveLocalizedString("camo_no_change_option", "camo_no_change_option"));
+		this.customization_data["paintName"].unshift(retrieveLocalizedString("paint_remove_option", "paint_remove_option"), retrieveLocalizedString("paint_no_change_option", "paint_no_change_option"));
+		this.customization_data["decalName"].unshift(retrieveLocalizedString("decal_remove_option", "decal_remove_option"), retrieveLocalizedString("decal_no_change_option", "decal_no_change_option"));
+		this.customization_data["camoID"].unshift(-1, 0);
+		this.customization_data["paintID"].unshift(-1, 0);
+		this.customization_data["decalID"].unshift(-1, 0);
+		
+		this.current_profile_camo.dataProvider = new DataProvider(this.customization_data["camoName"]);
+		this.current_profile_paint.dataProvider = new DataProvider(this.customization_data["paintName"]);
+		this.current_profile_camo.invalidateData();
+		this.current_profile_paint.invalidateData();
+		this.current_profile_camo.selectedIndex = 1; // default to no changes
+		this.current_profile_paint.selectedIndex = 1;
 	  }
 	  
 	  protected function addCurrentProfileToSwapList(event : Object) : void {
@@ -922,14 +1008,22 @@ package uml
 	  
 	  internal function reloadProfileSelector(event: Object = null, reload_current_profile: Boolean = true) : void {
 		if(this.toggle_show_ignore.selected) {
-			// show all profiles
-			this.list_profile_objects = this.list_all_profile_objects;
+			if(this.toggle_show_activated.selected) {
+				// show only the activated ones
+				this.list_profile_objects = [];
+				for each (var ob : Object in this.list_all_profile_objects) {
+					if(ob["enabled"]) this.list_profile_objects.push(ob)
+				}
+			} else {
+				// show all profiles
+				this.list_profile_objects = this.list_all_profile_objects;
+			}
 			//DebugUtils.LOG_WARNING("[UML GUI][AS] Debug: entering unfiltered profile @reloadProfileSelector");
 		} else {
 			// show un-ignored profiles
-			this.list_profile_objects = []
+			this.list_profile_objects = [];
 			for each(var o : Object in this.list_all_profile_objects) {
-				if(this.list_ignore_profiles.indexOf(o["name"]) < 0) { 
+				if(this.list_ignore_profiles.indexOf(o["name"]) < 0 && (!this.toggle_show_activated.selected || o["enabled"])) { 
 					this.list_profile_objects.push(o)
 				}
 			}
@@ -1040,7 +1134,9 @@ package uml
 	  }
 	  
 	  internal function createCheckbox(label: String, x: Number, y: Number) : CheckBox {
-		return addChild(App.utils.classFactory.getComponent("CheckBox", CheckBox, { "x": x, "y": y, "label": retrieveLocalizedString(label, label), "selected": false })) as CheckBox;
+		// hack to make sure checkbox always show its full length
+		var desc: String =  retrieveLocalizedString(label, label);
+		return addChild(App.utils.classFactory.getComponent("CheckBox", CheckBox, { "x": x, "y": y, "label": desc, "selected": false, "width": 10 + 10 * desc.length })) as CheckBox;
 	  }
 	  
 	  internal function createButton(label: String, x: Number, y: Number, dynamicSizeByText: Boolean = false) : SoundButtonEx {

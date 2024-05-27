@@ -9,10 +9,12 @@ from frameworks.wulf import WindowLayer
 import BigWorld
 import ResMgr
 from CurrentVehicle import g_currentVehicle, g_currentPreviewVehicle
+from helpers import getClientLanguage
 from items import vehicles, _xml
 import nations
 from items.components.c11n_constants import SeasonType
 
+import os
 import json
 import re
 _multispace_regex = re.compile("\s+")
@@ -436,8 +438,25 @@ class UML_MainGUI(UML_mainMeta):
         print("[UML GUI] Debug: " + str(result))
         return result
         
+    def getStringPositionFromPy(self, override_path="mods/configs/UML/ui_customize.json"):
+        flash_position_dict = {"start_x": 10, "start_y": 10, "box_offset": 3, "item_spacing": 10, "section_spacing": 40, "row_increment": 22, "profile_region_width": [200, 150, 300], "sound_region_width": [220, 100], "hybrid_region_width": [120, 200, 160, 160], "swapall_width": 160, "dropdown_width": 160, "subsection_indent": 20}
+        if override_path and os.path.isfile(override_path):
+            # load & override with the external override if any 
+            with open(override_path, "r") as ovrf:
+                override = json.load(ovrf)
+                flash_position_dict.update(override)
+        else:
+            print("[UML GUI] No file to override; use default.")
+            if override_path and self.getIsDebugUMLFromPy():
+                print("Also dumping example to path.")
+                with open(override_path, "w") as ovrf:
+                    json.dump(flash_position_dict, ovrf, indent=2)
+        return json.dumps(flash_position_dict)
+        
     def getStringLocalizationFromPy(self):
         use_cache = not self.getIsDebugUMLFromPy() # cache unless the debug mode is enabled.
+        language = getClientLanguage()
+        # print("[UML GUI]: Received client language: " + language);
         if use_cache or self._localization is None:
             try:
                 with open(self.localizationpath, "r") as locfile:
@@ -445,10 +464,13 @@ class UML_MainGUI(UML_mainMeta):
             except Exception as e:
                 # if cannot open, use default alongside a warning.
                 print("[UML GUI] Localization file cannot be loaded from `{}`; this will use & dump the default to directory.".format(self.localizationpath))
-                self._localization = localization = self._defaultLocalization()
+                self._localization = localization = {"en": self._defaultLocalization() }
                 with open(self.localizationpath, "w") as locfile:
                     json.dump(localization, locfile, indent=2)
-        return json.dumps(self._localization)
+        if language not in self._localization:
+            print("[UML GUI] Has no language '%s' in localization file, using default (en)", language)
+            return json.dumps(self._localization["en"])
+        return json.dumps(self._localization[language])
     
     def _defaultLocalization(self):
         return {
@@ -456,7 +478,7 @@ class UML_MainGUI(UML_mainMeta):
             "moe_options": ["Default MOE", "No MOE", "1 MOE", "2 MOE", "3 MOE"],
             "add_profile_to_moe_desc": "From Selector",
             "moe_list_desc": "applied to: ", # label linking MOE selector - MOE list
-            "moe_texture_desc": "using texture: ", # label linking MOE list - MOE icon selection; this doesnt work yet.
+            "moe_texture_desc": "using texture of: ", # label linking MOE list - MOE icon selection; this doesnt work yet.
             "moe_list_placeholder": "Test localization binding.", # doesnt work anyway since MOE get selected on entry.
             "affect_hangar_desc": "View UML effect in hangar",
             "remodels_filelist_desc": "Base Remodel files:",
@@ -475,8 +497,9 @@ class UML_MainGUI(UML_mainMeta):
             
             # Single profile section 
             "toggle_show_ignore_desc": "Show ignored profiles",
+            "toggle_show_activated_desc": "Show only activated profiles",
             "current_profile_ignore_desc": "Ignore by GUI",
-            "current_profile_target_desc": "Enabled profiles:",
+            "current_profile_target_desc": "Profile enabled for:",
             "current_profile_enable_desc": "Enabled",
             "current_profile_swapNPC_desc": "Model swap NPC",
             "current_profile_alignToTurret_desc": "Align to Turret",
@@ -484,6 +507,7 @@ class UML_MainGUI(UML_mainMeta):
             "current_profile_paint_desc": "Paint ID:",
             "current_profile_configString_desc": "Config:",
             "current_profile_style_progression_desc": "(Progress) Style:",
+            "sound_effect_desc": "Custom Sound",
             "current_profile_gunEffect_desc": "Gun Effect/Sound",
             "current_profile_soundTurret_desc": "Turret Sound",
             "current_profile_soundChassis_desc": "Chassis Sound (PC/NPC)",

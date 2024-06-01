@@ -58,9 +58,11 @@ class UML_MainGUI(UML_mainMeta):
     def __init__(self, *args, **kwargs):
         super(UML_MainGUI, self).__init__(*args, **kwargs)
         # NOTE: metapath/fullpath are using xml file so it's one directory in (res/res_mods) and need the ..; json are using python default so it's root
-        self.metapath, self.fullpath, self.localizationpath = '../mods/configs/UML/ownModelMeta.xml', "../mods/configs/UML/ownModel.xml", "mods/configs/UML/localization.json"
+        self.metapath, self.fullpath, self.localizationpath = '../mods/configs/UML/ownModelMeta.xml', "../mods/configs/UML/ownModel.xml", "scripts/client/mods/localization_{}.xml".format(getClientLanguage())
+        self.external_localizationpath = "mods/configs/UML/localization.json"
         self.sectionMeta = self.openXMLConfig(self.metapath)
         self.sectionMain = self.openXMLConfig(self.fullpath)
+        self.sectionLocalization = self.openXMLConfig(self.localizationpath)
         ctx = self.configCtx = (None, self.fullpath)
         self.sectionMainModel =  _xml.getChildren(ctx, self.sectionMain, 'models')
         self._localization = None
@@ -439,7 +441,7 @@ class UML_MainGUI(UML_mainMeta):
         return result
         
     def getStringPositionFromPy(self, override_path="mods/configs/UML/ui_customize.json"):
-        flash_position_dict = {"start_x": 10, "start_y": 10, "box_offset": 3, "item_spacing": 10, "section_spacing": 40, "row_increment": 22, "profile_region_width": [200, 150, 300], "sound_region_width": [220, 100], "hybrid_region_width": [120, 200, 160, 160], "swapall_width": 160, "dropdown_width": 160, "subsection_indent": 20}
+        flash_position_dict = {"start_x": 10, "start_y": 10, "box_offset": 3, "item_spacing": 10, "section_spacing": 40, "row_increment": 22, "profile_region_width": [200, 150, 300], "sound_region_width": [220, 100], "hybrid_region_width": [120, 200, 160, 160], "swapall_width": 160, "dropdown_width": 160, "subsection_indent": 20, "checkbox_width_per_char": 12}
         if override_path and os.path.isfile(override_path):
             # load & override with the external override if any 
             with open(override_path, "r") as ovrf:
@@ -456,19 +458,48 @@ class UML_MainGUI(UML_mainMeta):
     def getStringLocalizationFromPy(self):
         use_cache = not self.getIsDebugUMLFromPy() # cache unless the debug mode is enabled.
         language = getClientLanguage()
+        is_default_localization = False # this indicate if the localization is default (from inside python). Priority should be default < internal (xml) < external (json)
         # print("[UML GUI]: Received client language: " + language);
-        if use_cache or self._localization is None:
+        if not use_cache or self._localization is None:
             try:
-                with open(self.localizationpath, "r") as locfile:
+                with open(self.external_localizationpath, "r") as locfile:
                     self._localization = localization = json.load(locfile)
             except Exception as e:
                 # if cannot open, use default alongside a warning.
-                print("[UML GUI] Localization file cannot be loaded from `{}`; this will use & dump the default to directory.".format(self.localizationpath))
+                print("[UML GUI] Localization file cannot be loaded from `{}`; this will use & dump the default to directory.".format(self.external_localizationpath))
+                print("Specific error: {}".format(e))
                 self._localization = localization = {"en": self._defaultLocalization() }
-                with open(self.localizationpath, "w") as locfile:
+                is_default_localization = True
+            try:
+                internal_localization = dict()
+                for key, value in self._defaultLocalization().items():
+                    # use the hardcoded variant as the baseline; attempt to read associating values from xml
+                    value_type = str if isinstance(value, str) else (tuple, str)
+                    value = self.readValueFromSection(self.sectionLocalization, key, value_type, sectionCtx=None, default=None)
+                    if value:
+                        internal_localization[key] = value 
+                if internal_localization:
+                    if not is_default_localization:
+                        # what is at the localization is external (json), populate the xml result below it. 
+                        internal_localization.update(localization.get(language, dict()))
+                        localization[language] = internal_localization
+                    else:
+                        # what is at the localization is internal (py hardcode), populate the xml result above it 
+                        localization[language] = localization.get(language, dict())
+                        localization[language].update(internal_localization)
+            except Exception as e:
+                print("[UML GUI] Internal Localization file cannot be loaded from `{}`; this will use & dump the default to directory.".format(self.localizationpath))
+                print("Specific error: {}".format(e))
+            if is_default_localization:
+                print("[UML GUI] dumping the default (after-xml-merge): {}".format(localization))
+                # if default, also dumping the merged localization externally to allow modification
+                directory = os.path.dirname(self.external_localizationpath)
+                if not os.path.isdir(directory):
+                    os.mkdir(directory)
+                with open(self.external_localizationpath, "w") as locfile:
                     json.dump(localization, locfile, indent=2)
         if language not in self._localization:
-            print("[UML GUI] Has no language '%s' in localization file, using default (en)", language)
+            print("[UML GUI] Has no language '{}' in localization file, using default (en)".format(language))
             return json.dumps(self._localization["en"])
         return json.dumps(self._localization[language])
     

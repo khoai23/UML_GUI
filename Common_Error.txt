@@ -42,8 +42,8 @@ Compile the python binding with compileall
 C:\Python27\python.exe -m compileall py\mod_UML_interface.py
 
 Compile the swf, with its external swc(s) are found in gui-part1/2.pkg; stand in `root` folder (you should see the `as3` folder)
-..\flex_sdk_4.6.0.23201B\bin\mxmlc  -compiler.source-path=as3 -compiler.external-library-path+=as3\lib\common-1.0-SNAPSHOT.swc,as3\lib\gui_base-1.0-SNAPSHOT.swc -static-link-runtime-shared-libraries=true -o as3\UML_MainGUI.swf as3\uml\UML_MainGUI.as
-..\flex_sdk_4.6.0.23201B\bin\mxmlc.bat  -compiler.source-path=as3 -compiler.external-library-path+=as3\lib\common-1.0-SNAPSHOT.swc,as3\lib\gui_base-1.0-SNAPSHOT.swc -static-link-runtime-shared-libraries=true -o as3\UML_MainGUI.swf as3\uml\UML_MainGUI.as
+D:\Archive\flex_sdk_4.6.0.23201B\bin\mxmlc  -compiler.source-path=as3 -compiler.external-library-path+=as3\lib\common-1.0-SNAPSHOT.swc,as3\lib\gui_base-1.0-SNAPSHOT.swc -static-link-runtime-shared-libraries=true -o as3\UML_MainGUI.swf as3\uml\UML_MainGUI.as
+D:\Archive\flex_sdk_4.6.0.23201B\bin\mxmlc.bat  -compiler.source-path=as3 -compiler.external-library-path+=as3\lib\common-1.0-SNAPSHOT.swc,as3\lib\gui_base-1.0-SNAPSHOT.swc -static-link-runtime-shared-libraries=true -o as3\UML_MainGUI.swf as3\uml\UML_MainGUI.as
 If installed in Windows 64bit, consider using the mxmlc.bat trick if encountering "Could not find JVM". Content of it should be:
 """
 @echo off
@@ -55,7 +55,7 @@ Those swc can also be viewed using JPEXS Free Flash Decompiler
 
 Forced customization:
 C:\Python27\python.exe -m compileall py\mod_replaceOwnCustomization.py
-..\flex_sdk_4.6.0.23201B\bin\mxmlc  -compiler.source-path=as3 -compiler.external-library-path+=as3\lib\common-1.0-SNAPSHOT.swc,as3\lib\gui_base-1.0-SNAPSHOT.swc -static-link-runtime-shared-libraries=true -o as3\ROC_GUI.swf as3\uml\ReplaceOwnCustomizationGUI.as
+D:\Archive\flex_sdk_4.6.0.23201B\bin\mxmlc  -compiler.source-path=as3 -compiler.external-library-path+=as3\lib\common-1.0-SNAPSHOT.swc,as3\lib\gui_base-1.0-SNAPSHOT.swc -static-link-runtime-shared-libraries=true -o as3\ROC_GUI.swf as3\uml\ReplaceOwnCustomizationGUI.as
 Additionally, to pack into independent .wotmod (not updated)
 py pyc_to_wotmod.py py\mod_replaceOwnCustomization.py as3\ROC_GUI.swf ReplaceOwnCustomization.wotmod
 

@@ -1136,7 +1136,7 @@ package uml
 	  internal function createCheckbox(label: String, x: Number, y: Number) : CheckBox {
 		// hack to make sure checkbox always show its full length
 		var desc: String =  retrieveLocalizedString(label, label);
-		return addChild(App.utils.classFactory.getComponent("CheckBox", CheckBox, { "x": x, "y": y, "label": desc, "selected": false, "width": 10 + 10 * desc.length })) as CheckBox;
+		return addChild(App.utils.classFactory.getComponent("CheckBox", CheckBox, { "x": x, "y": y, "label": desc, "selected": false, "width": 10 + (this.localization_data["checkbox_width_per_char"] || 10) * desc.length })) as CheckBox;
 	  }
 	  
 	  internal function createButton(label: String, x: Number, y: Number, dynamicSizeByText: Boolean = false) : SoundButtonEx {

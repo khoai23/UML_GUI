@@ -505,6 +505,9 @@ class UML_MainGUI(UML_mainMeta):
     
     def _defaultLocalization(self):
         return {
+            # locale related GUI layout items.
+            "checkbox_width_per_char": 10,
+
             # General, UML wide section - MOE, show in hangar, additional filelist etc.
             "moe_options": ["Default MOE", "No MOE", "1 MOE", "2 MOE", "3 MOE"],
             "add_profile_to_moe_desc": "From Selector",

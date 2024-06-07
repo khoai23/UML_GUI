@@ -79,6 +79,8 @@ __soundEvents should hold the majority of cached sounds; __overriddenEvents SHOU
 Once we can leverage SoundGroups's MP3 function, we should be done for our 1st objective.
 
 
+All XML functions can be found at https://github.com/IzeBerg/wot-src/blob/57e191709d48e342936185e651812831714a04ef/sources/res/scripts/common/items/_xml.py
+
 GIMP:
 Edit separate channels by Color -> Components -> Decompose, choose RGBA, edit the other image as you please, then Recompose.
 AO map:

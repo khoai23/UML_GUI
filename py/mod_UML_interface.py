@@ -479,7 +479,12 @@ class UML_MainGUI(UML_mainMeta):
                 internal_localization = dict()
                 for key, value in self._defaultLocalization().items():
                     # use the hardcoded variant as the baseline; attempt to read associating values from xml
-                    value_type = str if isinstance(value, str) else (tuple, str)
+                    if isinstance(value, str):
+                        value_type = str
+                    elif isinstance(value, int):
+                        value_type = int
+                    else:
+                        value_type = (tuple, str)
                     value = self.readValueFromSection(self.sectionLocalization, key, value_type, sectionCtx=None, default=None)
                     if value:
                         internal_localization[key] = value 
@@ -521,6 +526,9 @@ class UML_MainGUI(UML_mainMeta):
     
     def _defaultLocalization(self):
         return {
+            # locale related GUI layout items.
+            "checkbox_width_per_char": 10,
+
             # General, UML wide section - MOE, show in hangar, additional filelist etc.
             "moe_options": ["Default MOE", "No MOE", "1 MOE", "2 MOE", "3 MOE"],
             "add_profile_to_moe_desc": "From Selector",

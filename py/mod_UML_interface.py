@@ -63,8 +63,11 @@ class UML_MainGUI(UML_mainMeta):
         self.sectionMeta = self.openXMLConfig(self.metapath)
         self.sectionMain = self.openXMLConfig(self.fullpath)
         self.sectionLocalization = self.openXMLConfig(self.localizationpath)
+        # get the subsection `models` of ownModel.xml
         ctx = self.configCtx = (None, self.fullpath)
         self.sectionMainModel =  _xml.getChildren(ctx, self.sectionMain, 'models')
+        # get the subsection `ui_customize` of localization_{language}.xml 
+        self.sectionUICustomize = _xml.getChildren((None, self.localizationpath), self.sectionLocalization, "ui_customize")
         self._localization = None
         
         self.metakey = {"remodelsFilelist" : "configLib"} # keys that will be written to sectionMeta
@@ -441,19 +444,21 @@ class UML_MainGUI(UML_mainMeta):
         return result
         
     def getStringPositionFromPy(self, override_path="mods/configs/UML/ui_customize.json"):
-        flash_position_dict = {"start_x": 10, "start_y": 10, "box_offset": 3, "item_spacing": 10, "section_spacing": 40, "row_increment": 22, "profile_region_width": [200, 150, 300], "sound_region_width": [220, 100], "hybrid_region_width": [120, 200, 160, 160], "swapall_width": 160, "dropdown_width": 160, "subsection_indent": 20, "checkbox_width_per_char": 12}
-        if override_path and os.path.isfile(override_path):
+        position_dict = self._defaultUICustomize() # base - internal json data
+        from_localization = self.getStringLocalizationFromPy().get("ui_customize", {}) # default - from xml if any is specified
+        position_dict.update(from_localization)
+        if override_path and os.path.isfile(override_path): # debug - if the external json is avaiable (assumed to be modified)
+            print("[UML GUI] Override option created & specified; use default.")
             # load & override with the external override if any 
             with open(override_path, "r") as ovrf:
                 override = json.load(ovrf)
-                flash_position_dict.update(override)
+                position_dict.update(override)
         else:
-            print("[UML GUI] No file to override; use default.")
             if override_path and self.getIsDebugUMLFromPy():
-                print("Also dumping example to path.")
+                print("[UML GUI] Debug mode enabled, dumping ui_customize.json file for manual modification.")
                 with open(override_path, "w") as ovrf:
-                    json.dump(flash_position_dict, ovrf, indent=2)
-        return json.dumps(flash_position_dict)
+                    json.dump(position_dict, ovrf, indent=2)
+        return json.dumps(position_dict)
         
     def getStringLocalizationFromPy(self):
         use_cache = not self.getIsDebugUMLFromPy() # cache unless the debug mode is enabled.
@@ -466,7 +471,7 @@ class UML_MainGUI(UML_mainMeta):
                     self._localization = localization = json.load(locfile)
             except Exception as e:
                 # if cannot open, use default alongside a warning.
-                print("[UML GUI] Localization file cannot be loaded from `{}`; this will use & dump the default to directory.".format(self.external_localizationpath))
+                print("[UML GUI] Localization file cannot be loaded from `{}`; this will use the default; will dump to directory if UML's debug is enabled.".format(self.external_localizationpath))
                 print("Specific error: {}".format(e))
                 self._localization = localization = {"en": self._defaultLocalization() }
                 is_default_localization = True
@@ -478,6 +483,17 @@ class UML_MainGUI(UML_mainMeta):
                     value = self.readValueFromSection(self.sectionLocalization, key, value_type, sectionCtx=None, default=None)
                     if value:
                         internal_localization[key] = value 
+                # attempt to get the `ui_customize` sub-section if available.
+                if self.sectionUICustomize:
+                    ui_customize_options = dict()
+                    for key, value in self._defaultUICustomize().items():
+                        value_type = int if isinstance(value, int) else (tuple, int)
+                        value = self.readValueFromSection(self.sectionUICustomize, key, value_type, sectionCtx=None, default=None)
+                        if value:
+                            ui_customize_options[key] = value 
+                    if ui_customize_options:
+                        internal_localization["ui_customize"] = ui_customize_options
+
                 if internal_localization:
                     if not is_default_localization:
                         # what is at the localization is external (json), populate the xml result below it. 
@@ -490,8 +506,8 @@ class UML_MainGUI(UML_mainMeta):
             except Exception as e:
                 print("[UML GUI] Internal Localization file cannot be loaded from `{}`; this will use & dump the default to directory.".format(self.localizationpath))
                 print("Specific error: {}".format(e))
-            if is_default_localization:
-                print("[UML GUI] dumping the default (after-xml-merge): {}".format(localization))
+            if is_default_localization and self.getIsDebugUMLFromPy(): 
+                print("[UML GUI] DEBUG mode, dumping the default (after-xml-merge): {}".format(localization))
                 # if default, also dumping the merged localization externally to allow modification
                 directory = os.path.dirname(self.external_localizationpath)
                 if not os.path.isdir(directory):
@@ -568,8 +584,25 @@ class UML_MainGUI(UML_mainMeta):
             "add_profile_as_parent_btn": "Add as Parent to ",
             
             "apply_btn": "Apply",
-            "reload_btn": "Reload",
-            }
+            "reload_btn": "Reload"
+        }   
+
+    def _defaultUICustomize(self):
+        return {
+            "start_x": 10, 
+            "start_y": 10, 
+            "box_offset": 3, 
+            "item_spacing": 10, 
+            "section_spacing": 40, 
+            "row_increment": 22, 
+            "profile_region_width": [200, 150, 300], 
+            "sound_region_width": [220, 100], 
+            "hybrid_region_width": [120, 200, 160, 160], 
+            "swapall_width": 160, 
+            "dropdown_width": 160, 
+            "subsection_indent": 20, 
+            "checkbox_width_per_char": 12
+        }
     
 """Add binding from the AS's UML_MainGUI class to the current python UML_MainGUI class"""
 g_entitiesFactories.addSettings(ViewSettings("UML_MainGUI", UML_MainGUI, 'UML_MainGUI.swf',
